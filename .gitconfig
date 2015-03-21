@@ -1,1 +1,5 @@
-git config --global push.default simple
+[user]
+	name = Axel Forsman
+	email = axelsfor@gmail.com
+[push]
+	default = simple
