@@ -1,0 +1,16 @@
+# Temporary files
+*.swp
+
+# Compiled source #
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*.P
+
+# OS generated files #
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
