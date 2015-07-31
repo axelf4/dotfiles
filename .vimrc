@@ -1,20 +1,21 @@
 set nocompatible " be iMproved
 set backspace=indent,eol,start " Allow backspace in insert mode
 set tabstop=4 " Have tabs as wide as four spaces
-syntax on " Enable syntax highlighting
 set wildmenu " Enhance command-line completion
 set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 set browsedir=buffer " File, Open dialog defaults to current file's directory
+set number " Enable line numbers
 
-colorscheme corporation
+syntax on " Enable syntax highlighting
+set background=dark
+colorscheme solarized " Use the Solarized Dark theme
 
-" Automatically remove trailing whitespace
-autocmd BufWritePre * :%s/\s\+$//e
+autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
 
-" Fast exit from Insert Mode
-inoremap jk <ESC>
-" Jump to line number with 123<Enter> instead of 123G/gg
-nnoremap <CR> G
+inoremap jk <ESC> " Fast exit from Insert Mode
+nnoremap <CR> G " Jump to line number with 123<Enter> instead of 123G/gg
+
+cnoremap sudow w !sudo tee % >/dev/null
 
 filetype off
 " set the runtime path to include Vundle and initialize
