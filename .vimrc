@@ -5,6 +5,7 @@ set wildmenu " Enhance command-line completion
 set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 set browsedir=buffer " File, Open dialog defaults to current file's directory
 set number " Enable line numbers
+set autoread " Reload files automatically
 
 syntax on " Enable syntax highlighting
 set background=dark
