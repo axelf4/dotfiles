@@ -3,5 +3,5 @@ export EDITOR="vim" # Use vim as default editor
 
 autoload -U colors && colors
 
-PROMPT="%{%K{blue}%}%{%0F%}%~%{$reset_color%}%{%4F%} %{$reset_color%}➜  %k%f"
+PROMPT="%{%K{blue}%}%{%0F%}%~%{%4F%k%}%{%f%} "
 # RPROMPT="%{%3F%}%{%f%0F%K{yellow}%}git%{$reset_color%}"
