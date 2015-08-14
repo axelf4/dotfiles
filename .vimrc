@@ -1,6 +1,6 @@
 set nocompatible " be iMproved
 set backspace=indent,eol,start " Allow backspace in insert mode
-set tabstop=4 " Have tabs as wide as four spaces
+set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab " Tabs are 4 columns wide
 set wildmenu " Enhance command-line completion
 set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 set browsedir=buffer " File, Open dialog defaults to current file's directory
