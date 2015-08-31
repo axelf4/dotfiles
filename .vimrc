@@ -11,12 +11,10 @@ syntax on " Enable syntax highlighting
 set background=dark
 colorscheme solarized " Use the Solarized Dark theme
 
-autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
-
-inoremap jk <ESC> " Fast exit from Insert Mode
 nnoremap <CR> G " Jump to line number with 123<Enter> instead of 123G/gg
 
-cnoremap sudow w !sudo tee % >/dev/null
+autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
+command Sudow execute "w !sudo tee % >/dev/null"
 
 filetype off
 " set the runtime path to include Vundle and initialize

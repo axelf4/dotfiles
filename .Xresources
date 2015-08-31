@@ -1,4 +1,5 @@
 URxvt.scrollBar: false ! Disable scrollbar
+URxvt.font: xft:Source Code Pro:Regular:size=8
 
 ! Solarized dark theme
 *.background: #002b36
