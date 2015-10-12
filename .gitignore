@@ -1,7 +1,7 @@
 # Temporary files
 *.swp
 
-# Compiled source #
+# Compiled source
 *.class
 *.dll
 *.exe
@@ -9,8 +9,12 @@
 *.so
 *.P
 
-# OS generated files #
+# OS generated files
 .DS_Store*
 ehthumbs.db
 Icon?
 Thumbs.db
+
+# YouCompleteMe config
+.ycm_extra_conf.py
+.ycm_extra_conf.pyc
