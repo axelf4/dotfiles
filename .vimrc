@@ -25,7 +25,5 @@ syntax on " Enable syntax highlighting
 set background=dark
 colorscheme solarized " Use the Solarized Dark theme
 
-nnoremap <CR> G " Jump to line number with 123<Enter> instead of 123G/gg
-
 autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
 command Sudow execute "w !sudo tee % >/dev/null"
