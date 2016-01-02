@@ -15,7 +15,7 @@ call vundle#begin()
 
 " let Vundle manage Vundle, required
 Plugin 'gmarik/Vundle.vim'
-Plugin 'tomasr/molokai'
+Plugin 'xoria256.vim'
 Plugin 'Valloric/YouCompleteMe'
 
 " All of your Plugins must be added before the following line
@@ -23,7 +23,7 @@ call vundle#end()
 filetype plugin indent on
 
 syntax on " Enable syntax highlighting
-colorscheme molokai " Use the Solarized Dark theme
+colorscheme xoria256 " Use the Solarized Dark theme
 
 autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
 cnoremap w!! w !sudo tee % " Sudo to write

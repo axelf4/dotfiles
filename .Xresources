@@ -1,22 +1,24 @@
 URxvt.scrollBar: false ! Disable scrollbar
-URxvt.font: xft:Source Code Pro:Regular:size=8
+URxvt.font: xft:Hack:size=11
 
-! Molokai theme
-*.background: #1B1D1E
-*.foreground: #F8F8F2
-*.color0: #1B1D1E
-*.color1: #B60050
-*.color2: #88BB22
-*.color3: #C47F2C
-*.color4: #30309B
-*.color5: #7E40A5
-*.color6: #4699AF
-*.color7: #9999AA
-*.color8: #303030
-*.color9: #F92672
-*.color10: #80FF00
-*.color11: #FFBA68
-*.color12: #7070F0
-*.color13: #BB88DD
-*.color14: #66D9EF
-*.color15: #F8F8F2
+! xoria256 theme
+URxvt.foreground      : #d0d0d0
+URxvt.background      : #1c1c1c
+URxvt.color0          : #121212
+URxvt.color8          : #121212
+URxvt.color1          : #df8787
+URxvt.color9          : #df8787
+URxvt.color2          : #afdf87
+URxvt.color10         : #afdf87
+URxvt.color3          : #dfdf87
+URxvt.color11         : #dfdf87
+URxvt.color4          : #87afdf
+URxvt.color12         : #87afdf
+URxvt.color5          : #dfafdf
+URxvt.color13         : #dfafdf
+URxvt.color6          : #afafdf
+URxvt.color14         : #afafdf
+URxvt.color7          : #eeeeee
+URxvt.color15         : #eeeeee
+URxvt.colorBD         : #dfafdf
+URxvt.colorUL         : #dfdfaf
