@@ -1,7 +1,6 @@
-# Temporary files
+[._]*s[a-w][a-z]
 *~
-*.swp
-
+tags
 # YouCompleteMe configurations
 .ycm_extra_conf.py
 .ycm_extra_conf.pyc
