@@ -1,0 +1,6 @@
+# Perform file completion in a case insensitive fashion
+set completion-ignore-case on
+# Display matches for ambiguous patterns at first tab press
+set show-all-if-ambiguous on
+set menu-complete-display-prefix on
+Tab: menu-complete
