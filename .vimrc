@@ -1,10 +1,7 @@
 call plug#begin('~/.vim/plugged')
-Plug 'xoria256.vim'
+Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
-Plug 'Valloric/YouCompleteMe'
-Plug 'junegunn/goyo.vim'
-Plug 'junegunn/limelight.vim'
-Plug 'altercation/vim-colors-solarized'
+" Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
 call plug#end()
 
 set number " Enable line numbers
@@ -16,7 +13,7 @@ set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capi
 " set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 
 let mapleader = "\<Space>"
-colorscheme xoria256
+colorscheme apprentice
 
 " Write as su
 command W w !sudo tee % > /dev/null
