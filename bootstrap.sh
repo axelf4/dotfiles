@@ -46,44 +46,44 @@ link_file () {
 
 				case "$action" in
 					o ) overwrite=true;;
-				O ) overwrite_all=true;;
-			b ) backup=true;;
-		B ) backup_all=true;;
-	s ) skip=true;;
-S ) skip_all=true;;
-		  * ) ;;
-	  esac
-  fi
+					O ) overwrite_all=true;;
+					b ) backup=true;;
+					B ) backup_all=true;;
+					s ) skip=true;;
+					S ) skip_all=true;;
+					* ) ;;
+				esac
+			fi
+		fi
+
+		overwrite=${overwrite:-$overwrite_all}
+		backup=${backup:-$backup_all}
+		skip=${skip:-$skip_all}
+
+		if [ "$overwrite" == "true" ]
+		then
+			rm -rf "$dst"
+			success "Removed $dst"
+		fi
+
+		if [ "$backup" == "true" ]
+		then
+			mv "$dst" "${dst}.backup"
+			success "Moved $dst to ${dst}.backup"
+		fi
+
+		if [ "$skip" == "true" ]
+		then
+			success "Skipped $src"
+		fi
 	fi
 
-	overwrite=${overwrite:-$overwrite_all}
-	backup=${backup:-$backup_all}
-	skip=${skip:-$skip_all}
-
-	if [ "$overwrite" == "true" ]
+	if [ "$skip" != "true" ]  # "false" or empty
 	then
-		rm -rf "$dst"
-		success "Removed $dst"
+		mkdir -p "$(dirname "${dst}")"
+		ln -s "$1" "$2"
+		success "Linked $1 to $2"
 	fi
-
-	if [ "$backup" == "true" ]
-	then
-		mv "$dst" "${dst}.backup"
-		success "Moved $dst to ${dst}.backup"
-	fi
-
-	if [ "$skip" == "true" ]
-	then
-		success "Skipped $src"
-	fi
-fi
-
-if [ "$skip" != "true" ]  # "false" or empty
-then
-	mkdir -p "$(dirname "${dst}")"
-	ln -s "$1" "$2"
-	success "Linked $1 to $2"
-fi
 }
 
 install_dotfiles () {
@@ -108,11 +108,11 @@ git pull origin master
 install_dotfiles
 
 while true; do
-	read -p "Do you wish to install Vundle? " yn
+	read -p "Install vim-plug? " yn
 	case $yn in
-		[Yy]* ) mkdir -p "$HOME/.vim/bundle"; git clone https://github.com/VundleVim/Vundle.vim.git "$HOME/.vim/bundle/Vundle.vim"; break;;
-	[Nn]* ) break;;
-* ) echo "Please answer yes or no.";;
+		[Yy]* ) curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim; break;;
+		[Nn]* ) break;;
+		* ) echo "Please answer yes or no.";;
 	esac
 done
 
