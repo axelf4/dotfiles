@@ -13,7 +13,7 @@ set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capi
 " set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 
 let mapleader = "\<Space>"
-colorscheme apprentice
+silent! colorscheme apprentice
 
 " Write as su
 command W w !sudo tee % > /dev/null
