@@ -15,6 +15,7 @@ set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capi
 let mapleader = "\<Space>"
 silent! colorscheme apprentice
 
+nnoremap <F5> :wall<Bar>make<CR>
 " Write as su
 command W w !sudo tee % > /dev/null
 autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
