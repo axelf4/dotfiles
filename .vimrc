@@ -2,6 +2,8 @@ call plug#begin('~/.vim/plugged')
 Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
 " Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
+
+Plug 'rust-lang/rust.vim'
 call plug#end()
 
 set number " Enable line numbers
@@ -26,3 +28,5 @@ if executable("ag")
     set grepprg=ag\ --nogroup\ --nocolor
 	let g:ctrlp_user_command = 'ag %s -l --nocolor -g ""'
 endif
+
+let g:rustfmt_autosave = 1
