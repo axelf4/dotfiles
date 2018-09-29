@@ -4,6 +4,7 @@ Plug 'ctrlpvim/ctrlp.vim'
 " Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
 
 Plug 'rust-lang/rust.vim'
+Plug 'pangloss/vim-javascript'
 call plug#end()
 
 set number " Enable line numbers
