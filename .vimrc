@@ -7,13 +7,11 @@ Plug 'rust-lang/rust.vim'
 Plug 'pangloss/vim-javascript'
 call plug#end()
 
-set number " Enable line numbers
 set backspace=indent,eol,start " Allow backspace in insert mode
 set shiftwidth=4 tabstop=4 noexpandtab " Tabs are 4 columns wide
 set hidden " Hide buffers instead of closing them
 set wildmenu " Enhance command-line completion
 set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capitals are used
-" set clipboard=unnamed " Use the OS clipboard by default (on versions compiled with `+clipboard`)
 
 let mapleader = "\<Space>"
 silent! colorscheme apprentice
