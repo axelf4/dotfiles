@@ -22,3 +22,5 @@ PS1='\[\033[36m\]\w\[\033[1;31m\]$(prompt_git)\[\033[0m\] ❯ '
 
 alias ..="cd .."
 alias ...="cd ../.."
+
+alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
