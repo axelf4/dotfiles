@@ -8,7 +8,7 @@ if exists('b:did_indent') | finish | endif
 let b:did_indent = 1
 
 setlocal indentexpr=GetMatlabIndent()
-setlocal indentkeys=!,o,O,0=end,e,0=elsei,0=elseif,0=case,0=otherwise,0=catch,0=function
+setlocal indentkeys=!,o,O,e,0=end,0=elseif,0=case,0=otherwise,0=catch,0=function,0=elsei
 
 " The value of the Function indenting format in
 " MATLAB Editor/Debugger Language Preferences.
@@ -16,20 +16,15 @@ setlocal indentkeys=!,o,O,0=end,e,0=elsei,0=elseif,0=case,0=otherwise,0=catch,0
 " and 2 for Indent all functions (default).
 let b:MATLAB_function_indent = get(g:, 'MATLAB_function_indent', 2)
 
-let s:open_pat = 'for\|if\|parfor\|spmd\|switch\|try\|while\|classdef\|properties\|methods\|events\|enumeration'
-let s:middle_pat = 'else\|elseif\|case\|otherwise\|catch'
-let b:pair_pat = '\C\(\<\%('
-			\ . (b:MATLAB_function_indent == 1 ? '\s\@<=' : '')
-			\ . (b:MATLAB_function_indent >= 1 ? 'function\|' : '')
-			\ . s:open_pat . '\|\%(^\s*\)\@<=\%(' . s:middle_pat . '\)\)\>\|\[\|{\)'
-			\ . '\|\(\%(\S.*\)\@<=\<end\>\|\]\|}\)'
-
 " Only define the function once
 if exists("*GetMatlabIndent") | finish | endif
 
-let s:dedent_pat = '\C^\s*\<\%(end\|else\|elseif\|catch\|otherwise\|\(case\|function\)\)\>'
+let s:end = '\<end\>\%([^(]*)\)\@!' " Array indexing heuristic
+let s:open_pat = 'for\|if\|parfor\|spmd\|switch\|try\|while\|classdef\|properties\|methods\|events\|enumeration'
+let s:dedent_pat = '\C^\s*\zs\<\%(end\|else\|elseif\|catch\|\(case\|otherwise\|function\)\)\>'
 let s:start_pat = '\C\<\%(function\|' . s:open_pat . '\)\>'
-let s:search_flags = 'cp' . (has('patch-7.4.984') ? 'z' : '')
+let s:bracket_pair_pat = '\(\[\|{\)\|\(\]\|}\)'
+let s:zflag = has('patch-7.4.984') ? 'z' : ''
 
 " Returns whether a comment or string envelops the specified column.
 function! s:IsCommentOrString(lnum, col)
@@ -46,38 +41,76 @@ function! s:IsLineContinuation(lnum)
 	endwhile
 endfunction
 
-function! s:GetOpenCloseCount(lnum, ...)
-	let endcol = a:0 >= 1 ? a:1 : 0
-	let i = 0 | let line = getline(a:lnum)
+function! s:SubmatchCount(lnum, pattern, ...)
+	let endcol = a:0 >= 1 ? a:1 : 1 / 0 | let x = [0, 0, 0, 0]
 	call cursor(a:lnum, 1)
 	while 1
-		let [lnum, c, submatch] = searchpos(b:pair_pat, s:search_flags, a:lnum)
-		if !submatch || endcol && c >= endcol | break | endif
-		if !s:IsCommentOrString(lnum, c)
-					\ && line[c - 3:] !~# 'end[^(]*)' " Array indexing heuristic
-			let i += submatch == 2 ? 1 : -1
-		endif
-		if c == col('$') - 1 | break | endif
-		call cursor(0, c + 1)
+		let [lnum, c, submatch] = searchpos(a:pattern, 'cpe' . s:zflag, a:lnum)
+		if !submatch || c >= endcol | break | endif
+		if !s:IsCommentOrString(lnum, c) | let x[submatch - 2] += 1 | endif
+		if cursor(0, c + 1) == -1 || col('.') == c | break | endif
 	endwhile
-	return i
+	return x
 endfunction
 
+function! s:GetOpenCloseCount(lnum, pattern, ...)
+	let counts = call('s:SubmatchCount', [a:lnum, a:pattern] + a:000)
+	return counts[0] - counts[1]
+endfunction
+
+" The value of b:changedtick during last call
+let b:MATLAB_lasttick = -1
+" The last indented line
+let b:MATLAB_lastline = -1
+" Whether the line above was a line continuation
+let b:MATLAB_waslc = 0
+let b:MATLAB_bracketlevel = 0
+
 function! GetMatlabIndent()
-	" Align end, etc. with start of block
+	let prevlnum = prevnonblank(v:lnum - 1)
+
+	if b:MATLAB_lasttick != b:changedtick || b:MATLAB_lastline != prevlnum
+		" Recalculate bracket count (only have to check same block minus one line)
+		let b:MATLAB_bracketlevel = 0
+		let previndent = indent(prevlnum) | let l = prevlnum
+		while 1
+			let l = prevnonblank(l - 1) | let indent = indent(l)
+			if l <= 0 || previndent < indent | break | endif
+			let b:MATLAB_bracketlevel += s:GetOpenCloseCount(l, s:bracket_pair_pat)
+			if previndent != indent | break | endif
+		endwhile
+
+		let b:MATLAB_waslc = s:IsLineContinuation(prevlnum - 1)
+	endif
+	" If line above was blank it can impossibly have been a LC
+	let above_lc = b:MATLAB_lasttick == b:changedtick && prevlnum != v:lnum - 1 && b:MATLAB_lastline == prevlnum ? 0 : s:IsLineContinuation(v:lnum - 1)
+
+	let pair_pat = '\C\<\(' . s:open_pat . '\|'
+				\ . (b:MATLAB_function_indent == 1 ? '^\@<!' : '')
+				\ . (b:MATLAB_function_indent >= 1 ? 'function\|' : '')
+				\ . '\|\%(^\s*\)\@<=\%(else\|elseif\|case\|otherwise\|catch\)\)\>'
+				\ . '\|\S\s*\zs\(' . s:end . '\)'
+	let [open, close, b_open, b_close] = prevlnum ? s:SubmatchCount(prevlnum,
+				\ pair_pat . '\|' . s:bracket_pair_pat) : [0, 0, 0, 0]
+	let curbracketlevel = b:MATLAB_bracketlevel + b_open - b_close
+
 	call cursor(v:lnum, 1)
-	let submatch = search(s:dedent_pat, s:search_flags, v:lnum)
+	let submatch = search(s:dedent_pat, 'cp' . s:zflag, v:lnum)
 	if submatch && !s:IsCommentOrString(v:lnum, col('.'))
-		let [lnum, col] = searchpairpos(s:start_pat, '',  '\C\<end\>', 'bW', 's:IsCommentOrString(line("."), col("."))')
-		return lnum ? indent(lnum) + shiftwidth() * (s:GetOpenCloseCount(lnum, col) + submatch == 2) : 0
+		" Align end, et cetera with start of block
+		let [lnum, col] = searchpairpos(s:start_pat, '',  '\C' . s:end, 'bW', 's:IsCommentOrString(line("."), col("."))')
+		let result = lnum ? indent(lnum) + shiftwidth() * (s:GetOpenCloseCount(lnum, pair_pat, col) + submatch == 2) : 0
+	else
+		" Count how many blocks the previous line opens/closes
+		" Line continuations/brackets indent once per statement
+		let result = indent(prevlnum) + shiftwidth() * (open - close
+					\ + (b:MATLAB_bracketlevel ? -!curbracketlevel : !!curbracketlevel)
+					\ + (curbracketlevel <= 0) * (above_lc - b:MATLAB_waslc))
 	endif
 
-	let prev_lnum = prevnonblank(v:lnum - 1)
-	" Count how many blocks the previous line opens/closes
-	let i = prev_lnum ? s:GetOpenCloseCount(prev_lnum) : 0
-
-	" Line continuations indent once per statement
-	let i += s:IsLineContinuation(v:lnum - 1) - s:IsLineContinuation(v:lnum - 2)
-
-	return indent(prev_lnum) + shiftwidth() * i
+	let b:MATLAB_waslc = above_lc
+	let b:MATLAB_bracketlevel = curbracketlevel
+	let b:MATLAB_lasttick = b:changedtick
+	let b:MATLAB_lastline = v:lnum
+	return result
 endfunction
