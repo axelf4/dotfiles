@@ -18,7 +18,7 @@ silent! colorscheme apprentice
 
 nnoremap <F5> :wall<Bar>make<CR>
 " Write as su
-command W w !sudo tee % > /dev/null
+command! W w !sudo tee % > /dev/null
 autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
 
 let g:ctrlp_working_path_mode = 0
