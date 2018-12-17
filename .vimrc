@@ -12,6 +12,7 @@ set shiftwidth=4 tabstop=4 noexpandtab " Tabs are 4 columns wide
 set hidden " Hide buffers instead of closing them
 set wildmenu " Enhance command-line completion
 set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capitals are used
+set nohlsearch " Package maintainers keep meddling with the defaults
 
 let mapleader = "\<Space>"
 silent! colorscheme apprentice
