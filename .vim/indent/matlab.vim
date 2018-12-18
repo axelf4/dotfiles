@@ -15,9 +15,18 @@ setlocal indentkeys=!,o,O,e,0=end,0=elseif,0=case,0=otherwise,0=catch,0=functio
 " The possible values are 0 for Classic, 1 for Indent nested functions
 " and 2 for Indent all functions (default).
 let b:MATLAB_function_indent = get(g:, 'MATLAB_function_indent', 2)
+" The previous value of b:changedtick
+let b:MATLAB_lasttick = -1
+" The previously indented line
+let b:MATLAB_lastline = -1
+" Whether the line above was a line continuation
+let b:MATLAB_waslc = 0
+let b:MATLAB_bracketlevel = 0
 
 " Only define the function once
 if exists("*GetMatlabIndent") | finish | endif
+let s:keepcpo = &cpo
+set cpo&vim
 
 let s:end = '\<end\>\%([^(]*)\)\@!' " Array indexing heuristic
 let s:open_pat = 'for\|if\|parfor\|spmd\|switch\|try\|while\|classdef\|properties\|methods\|events\|enumeration'
@@ -58,19 +67,11 @@ function! s:GetOpenCloseCount(lnum, pattern, ...)
 	return counts[0] - counts[1]
 endfunction
 
-" The value of b:changedtick during last call
-let b:MATLAB_lasttick = -1
-" The last indented line
-let b:MATLAB_lastline = -1
-" Whether the line above was a line continuation
-let b:MATLAB_waslc = 0
-let b:MATLAB_bracketlevel = 0
-
 function! GetMatlabIndent()
 	let prevlnum = prevnonblank(v:lnum - 1)
 
 	if b:MATLAB_lasttick != b:changedtick || b:MATLAB_lastline != prevlnum
-		" Recalculate bracket count (only have to check same block minus one line)
+		" Recalculate bracket count (only have to check same block and line above)
 		let b:MATLAB_bracketlevel = 0
 		let previndent = indent(prevlnum) | let l = prevlnum
 		while 1
@@ -114,3 +115,6 @@ function! GetMatlabIndent()
 	let b:MATLAB_lastline = v:lnum
 	return result
 endfunction
+
+let &cpo = s:keepcpo
+unlet s:keepcpo
