@@ -2,6 +2,7 @@ call plug#begin('~/.vim/plugged')
 Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
 " Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
+Plug 'Raimondi/delimitMate' " Auto closing of brackets, etc.
 
 Plug 'rust-lang/rust.vim'
 Plug 'pangloss/vim-javascript'
@@ -28,5 +29,8 @@ if executable("rg")
 	set grepprg=rg\ --vimgrep\ --no-heading\ --smart-case
 	let g:ctrlp_user_command = 'rg %s --files --color=never --glob ""'
 endif
+
+let delimitMate_expand_cr = 1
+let delimitMate_balance_matchpairs = 1
 
 let g:rustfmt_autosave = 1
