@@ -9,25 +9,29 @@ Plug 'pangloss/vim-javascript'
 call plug#end()
 
 set backspace=indent,eol,start " Allow backspace in insert mode
-set shiftwidth=4 tabstop=4 noexpandtab " Tabs are 4 columns wide
-set hidden " Hide buffers instead of closing them
+set tabstop=4 shiftwidth=0 noexpandtab " 4 columns wide tabs
+set hidden " Hide buffers instead of unloading them
 set wildmenu " Enhance command-line completion
-set incsearch ignorecase smartcase " Matches as you type, case-sensitive if capitals are used
+set incsearch ignorecase smartcase " Matches as you type, case-insensitive without capitals
+set splitbelow splitright
 set nohlsearch " Package maintainers keep meddling with the defaults
 
-let mapleader = "\<Space>"
 silent! colorscheme apprentice
-
+let mapleader = "\<Space>"
 nnoremap <F5> :wall<Bar>make<CR>
-" Write as su
-command! W w !sudo tee % > /dev/null
-autocmd BufWritePre * :%s/\s\+$//e " Automatically remove trailing whitespace
+" Write with sudo from within Vim
+command! -bar W w !sudo tee % >/dev/null
+augroup vimrc
+	autocmd!
+	" Automatically remove trailing whitespace
+	autocmd BufWritePre * %s/\s\+$//e
+augroup END
 
-let g:ctrlp_working_path_mode = 0
-let g:ctrlp_use_caching = 0
+let ctrlp_working_path_mode = 0
+let ctrlp_use_caching = 0
 if executable("rg")
 	set grepprg=rg\ --vimgrep\ --no-heading\ --smart-case
-	let g:ctrlp_user_command = 'rg %s --files --color=never --glob ""'
+	let ctrlp_user_command = 'rg %s --files --color=never --glob ""'
 endif
 
 let delimitMate_expand_cr = 1
