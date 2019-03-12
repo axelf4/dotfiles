@@ -40,12 +40,12 @@ endfunction
 " Takes option if want to grab focus
 " and optional command
 "
-" Then one function that sends keys to the runner
-" Try to have it use Vim format of specifying keys
-"
 " And one function that uses some combination of the above two to do the whole
 " Quickfix thingy-majiggy
+"
+" Either provide a target or it will create a short-lived one
 
+" TODO Maybe rename to targets
 " let g:asyncrun#runners = []
 
 function! asyncrun#NewRunner(opts) abort
@@ -112,6 +112,8 @@ function! asyncrun#Run() abort
 	" call s:TmuxPoll() " Pick up on any quick commands
 endfunction
 
+" Sends the specified keys to the target
+" TODO Try to have it use Vim format of specifying keys
 function! asyncrun#SendKeys(runner, keys) abort
 	call system('tmux send-keys -t ' . a:runner.pane . ' ' . a:keys)
 endfunction
@@ -133,32 +135,8 @@ function! s:Complete(request, status) abort
 	silent doautocmd ShellCmdPost
 endfunction
 
-" Tmux {{{
-let s:tmux_reset_seq = 'q C-u ' " Key sequence for leaving copy-mode and clearing prompt
-
-function! s:TmuxPoll() abort
-	if s:HasCallback() | return | endif
-
-	let panes = split(system('tmux list-panes -a -F "#{pane_id}"'), '\n')
-	for [pane, request] in items(s:pending)
-		if index(panes, pane) == -1
-			call remove(s:pending, pane)
-			let status = readfile(request.file . '.complete', '', 1)[0]
-			call s:Complete(request, status)
-		endif
-	endfor
-endfunction
-
-augroup asyncrun
-	autocmd!
-	autocmd VimResized * nested call s:TmuxPoll()
-augroup END
-
-function! asyncrun#GetTmux() abort
-endfunction
-
 " Prompts the user for a target window
-function! s:PromptWindow(Cb) abort
+function! asyncrun#PromptWindow(Cb) abort
 	let paneslist = split(system('tmux list-panes -F "#{pane_id}/#{pane_current_command}"'), '\n')
 	let panes = {}
 	for p in paneslist
@@ -183,32 +161,33 @@ function! s:PromptWindow(Cb) abort
 	endwhile
 
 	" TODO Look into using syntax region for cell lookup based on cursor pos
-	" Recursive procedure for drawing the cells
+	" Recursive procedure for drawing cells
 	function! DrawCell(node, x, y, w, h) abort
 		let type = a:node.type
 		if type == 0
 			let text = a:node.wp . ':' . a:node.command
-			silent execute 'normal! ' . (a:y + a:h / 2) . 'G' . (a:x + (a:w - strdisplaywidth(text)) / 2) . '|R' . text . "\<Esc>"
+			execute 'normal! ' . (a:y + a:h / 2) . 'G' . (a:x + (a:w - strdisplaywidth(text)) / 2) . '|R' . text . "\<Esc>"
 		else
-			let nchildren = len(a:node.children)
-			let percell = ((type == 1 ? a:w : a:h) - (nchildren - 1)) / nchildren
-			let [cx, cy] = [a:x, a:y] | let [cw, ch] = type == 1 ? [percell, a:h] : [a:w, percell]
-			for i in range(0, nchildren - 1)
+			let nchildren = len(a:node.children) | let l = type == 1 ? a:w : a:h
+			let percell = (l - (nchildren - 1)) / nchildren | let rem = (l - (nchildren - 1)) % nchildren
+			let [cx, cy] = [a:x, a:y]
+			for i in range(nchildren)
+				let [cw, ch] = type == 1 ? [percell + (i < rem), a:h] : [a:w, percell + (i < rem)]
 				call DrawCell(a:node.children[i], cx, cy, cw, ch)
-				let [cx, cy] += type == 1 ? [percell, 0] : [0, percell]
-				if i != 1 | silent execute 'normal! ' . cy . 'G' . cx . "|\<C-V>" . (type == 1 ? (ch - 1) . 'jr║' : (cw - 1) . 'lr═') | endif
+				let [cx, cy] += type == 1 ? [cw, 0] : [0, ch]
+				if i != nchildren - 1 | execute 'normal! ' . cy . 'G' . cx . "|\<C-V>" . (type == 1 ? (ch - 1) . 'jr║' : (cw - 1) . 'lr═') | endif
 				let [cx, cy] += type == 1 ? [1, 0] : [0, 1]
 			endfor
 		endif
 	endfunction
-	new __Window_Select__ " Create new window
-	setlocal buftype=nofile bufhidden=hide noswapfile nobuflisted modifiable nonumber
+	silent keepalt new __Window_Select__ " Create new window
+	setlocal buftype=nofile bufhidden=hide noswapfile nobuflisted nonumber nolist modifiable
 	let b:Cb = a:Cb " Store callback in buffer
 	let virtualedit = &virtualedit | set virtualedit=all " Enable 'virtualedit'
 	silent normal! ggdGg$
-	let [w, h] = [virtcol('.'), winheight(0) - &cmdheight]
-	for i in range(1, h) | call append(0, '') | endfor " Fill buffer with lines
-	call DrawCell(head.children[0], 1, 1, w, h)
+	let [w, h] = [virtcol('.'), winheight(0)]
+	for i in range(h - 1) | call append(0, '') | endfor " Fill buffer with lines
+	silent call DrawCell(head.children[0], 1, 1, w, h)
 	let &virtualedit = virtualedit " Restore 'virtualedit'
 	setlocal nomodifiable
 	silent execute "normal! gg0/\\d\\+\<CR>"
@@ -223,6 +202,27 @@ function! s:PromptWindow(Cb) abort
 	nnoremap <script> <buffer> <nowait> <silent> <C-n> /\d\+<CR>
 	nnoremap <script> <buffer> <nowait> <silent> <C-p> ?\d\+<CR>
 endfunction
+
+" Tmux {{{
+let s:tmux_reset_seq = 'q C-u ' " Key sequence for leaving copy-mode and clearing prompt
+
+function! s:TmuxPoll() abort
+	if s:HasCallback() | return | endif
+
+	let panes = split(system('tmux list-panes -a -F "#{pane_id}"'), '\n')
+	for [pane, request] in items(s:pending)
+		if index(panes, pane) == -1
+			call remove(s:pending, pane)
+			let status = readfile(request.file . '.complete', '', 1)[0]
+			call s:Complete(request, status)
+		endif
+	endfor
+endfunction
+
+augroup asyncrun
+	autocmd!
+	autocmd VimResized * nested call s:TmuxPoll()
+augroup END
 " }}}
 
 " TODO Try to do some templating macro magic conditional compilation
@@ -249,6 +249,8 @@ endfunction
 " Called by the command :AsyncRun.
 function! asyncrun#AsyncRunCommand(args, mods) abort
 	" Skip trailing comments and parse optional bar
+	" TODO make this smarter, bar could be in string etc. (wild thought use
+	" Vimscript syntax highlighting for this purpose?)
 	let [str, cmd, after] = matchlist(a:args, '^\([^"|]*\)|\?\([^"]*\)"\?.*$')[:2]
 	echom cmd
 	echom after
@@ -263,12 +265,15 @@ function! asyncrun#SendText(pane_id, text) abort
 endfunction
 
 " TODO Try to make it into one unified function for operator in visual/normal
-" and command
+" and command with range
 " Enters the specified text into a REPL for example
+" Buffer-local variable for storing last used pane
 function! asyncrun#SlimeOperator(type, ...) abort
 	let sel_save = &selection | let &selection = "inclusive" | let reg_save = @@
 	" If invoked from Visual mode, use gv command.
 	silent execute 'normal! ' . (a:0 ? 'gv' : '`[' . (a:type ==# 'line' ? 'V': 'v') . '`]') . 'y'
 	let text = @@ | let &selection = sel_save | let @@ = reg_save
-	call s:PromptWindow({pane_id -> asyncrun#SendText(pane_id, text)})
+	" XXX Maybe use tmux paste-buffer for large texts
+	" TODO (Optionally) Strip leading whitespace and empty lines
+	call asyncrun#PromptWindow({pane_id -> asyncrun#SendText(pane_id, text)})
 endfunction
