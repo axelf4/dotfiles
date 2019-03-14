@@ -108,8 +108,8 @@ function! asyncrun#Run() abort
 		call asyncrun#SendKeys(runner, s:tmux_reset_seq . cmd . ' Enter')
 	endif
 
-	" let s:pending[pane] = request
-	" call s:TmuxPoll() " Pick up on any quick commands
+	let s:pending[pane] = request
+	call s:TmuxPoll() " Pick up on any quick commands
 endfunction
 
 " Sends the specified keys to the target
@@ -135,48 +135,30 @@ function! s:Complete(request, status) abort
 	silent doautocmd ShellCmdPost
 endfunction
 
-" Prompts the user for a target window
+" Prompts the user for a target window, referring to Vim's usage of the word
+"
+" After this function returns and in the absence of errors, the current
+" buffer/window is guaranteed to belong to the prompt.
 function! asyncrun#PromptWindow(Cb) abort
-	let paneslist = split(system('tmux list-panes -F "#{pane_id}/#{pane_current_command}"'), '\n')
-	let panes = {}
-	for p in paneslist
-		let panes[split(p, '/')[0][1:]] = split(p, '/')[1]
-	endfor
-
-	" Parse tmux layout
-	let layout = system('tmux display-message -p "#{window_layout}"')[5:-2] " Trim checksum & NL
-	let head = {'children': []} | let parent = head
-	while layout !~# '^\s*$' " While layout desc is not empty
-		" Parse layout cell: window ptr and split type (see layout-custom.c)
-		let [str, wp, sep, layout; rest] = matchlist(layout, '^\d\+x\d\+,\d\+,\d\+\%(,\(\d*\)x\@!\)\?\([{[\_$]\|[,}\]]\+\)\(.*\)$')
-
-		let type = sep ==# '{' ? 1 : sep ==# '[' ? 2 : 0 " Vertical is 1, horizontal is 2
-		let command = empty(wp) ? '' : panes[wp]
-		let node = {'wp': wp, 'type': type, 'parent': parent, 'children': [], 'command': command}
-		call add(parent.children, node)
-		if type != 0 | let parent = node | endif
-		for sign in split(sep, '\zs')
-			if sign ==# '}' || sign ==# ']' | let parent = parent.parent | endif
-		endfor
-	endwhile
+	let [head, windowLabels] = s:TmuxWinlayout()
 
 	" TODO Look into using syntax region for cell lookup based on cursor pos
 	" Recursive procedure for drawing cells
-	function! DrawCell(node, x, y, w, h) abort
-		let type = a:node.type
-		if type == 0
-			let text = a:node.wp . ':' . a:node.command
+	function! DrawCell(node, x, y, w, h, windowLabels) abort
+		let type = a:node[0]
+		if type ==# 'leaf'
+			let text = a:windowLabels[a:node[1]]
 			execute 'normal! ' . (a:y + a:h / 2) . 'G' . (a:x + (a:w - strdisplaywidth(text)) / 2) . '|R' . text . "\<Esc>"
 		else
-			let nchildren = len(a:node.children) | let l = type == 1 ? a:w : a:h
+			let nchildren = len(a:node[1]) | let l = type ==# 'row' ? a:w : a:h
 			let percell = (l - (nchildren - 1)) / nchildren | let rem = (l - (nchildren - 1)) % nchildren
 			let [cx, cy] = [a:x, a:y]
 			for i in range(nchildren)
-				let [cw, ch] = type == 1 ? [percell + (i < rem), a:h] : [a:w, percell + (i < rem)]
-				call DrawCell(a:node.children[i], cx, cy, cw, ch)
-				let [cx, cy] += type == 1 ? [cw, 0] : [0, ch]
-				if i != nchildren - 1 | execute 'normal! ' . cy . 'G' . cx . "|\<C-V>" . (type == 1 ? (ch - 1) . 'jr║' : (cw - 1) . 'lr═') | endif
-				let [cx, cy] += type == 1 ? [1, 0] : [0, 1]
+				let [cw, ch] = type ==# 'row' ? [percell + (i < rem), a:h] : [a:w, percell + (i < rem)]
+				call DrawCell(a:node[1][i], cx, cy, cw, ch, a:windowLabels)
+				let [cx, cy] += type ==# 'row' ? [cw, 0] : [0, ch]
+				if i != nchildren - 1 | execute 'normal! ' . cy . 'G' . cx . "|\<C-V>" . (type ==# 'row' ? (ch - 1) . 'jr║' : (cw - 1) . 'lr═') | endif
+				let [cx, cy] += type ==# 'row' ? [1, 0] : [0, 1]
 			endfor
 		endif
 	endfunction
@@ -187,7 +169,7 @@ function! asyncrun#PromptWindow(Cb) abort
 	silent normal! ggdGg$
 	let [w, h] = [virtcol('.'), winheight(0)]
 	for i in range(h - 1) | call append(0, '') | endfor " Fill buffer with lines
-	silent call DrawCell(head.children[0], 1, 1, w, h)
+	silent call DrawCell(head, 1, 1, w, h, windowLabels)
 	let &virtualedit = virtualedit " Restore 'virtualedit'
 	setlocal nomodifiable
 	silent execute "normal! gg0/\\d\\+\<CR>"
@@ -197,10 +179,14 @@ function! asyncrun#PromptWindow(Cb) abort
 		if word =~# '\D' | return | endif
 		try | call b:Cb('%' . word) | finally | quit | endtry
 	endfunction
-	" TODO add onclose and onleave aucmds
 	nnoremap <script> <buffer> <nowait> <silent> <CR> :call <SID>WindowSelectEnter()<CR>
 	nnoremap <script> <buffer> <nowait> <silent> <C-n> /\d\+<CR>
 	nnoremap <script> <buffer> <nowait> <silent> <C-p> ?\d\+<CR>
+
+	augroup asyncrunprompt
+		autocmd! * <buffer>
+		autocmd WinLeave <buffer> quit
+	augroup END
 endfunction
 
 " Tmux {{{
@@ -221,8 +207,35 @@ endfunction
 
 augroup asyncrun
 	autocmd!
-	autocmd VimResized * nested call s:TmuxPoll()
+	autocmd VimResized * call s:TmuxPoll()
 augroup END
+
+" Parse tmux window layout into format compatible with winlayout()
+function! s:TmuxWinlayout() abort
+	let layout = system('tmux display-message -p "#{window_layout}"')[5:-2] " Trim checksum & NL
+	let stack = []
+	while layout !~# '^\s*$' " While layout desc is not empty
+		" Parse layout cell: window ptr and split type (see layout-custom.c)
+		let [str, wp, sep, layout; rest] = matchlist(layout, '^\d\+x\d\+,\d\+,\d\+\%(,\(\d*\)x\@!\)\?\([{[\_$]\|[,}\]]\+\)\(.*\)$')
+		let type = sep ==# '[' ? 'col' : sep ==# '{' ? 'row' : 'leaf'
+		let node = [type, type ==# 'leaf' ? wp : []]
+		if empty(stack) | let head = node | else | call add(stack[-1][1], node) | endif " Add to parent
+		if type !=# 'leaf' | call add(stack, node) | endif " Push to parent stack
+		for sign in split(sep, '\zs')
+			if sign ==# '}' || sign ==# ']' | unlet stack[-1] | endif
+		endfor
+	endwhile
+
+	" Get names of commands running in panes
+	let panes = split(system('tmux list-panes -F "#{pane_id}/#{pane_current_command}"'), '\n')
+	let windowLabels = {}
+	for p in panes
+		let [pane_id, command] = split(p, '/')
+		let windowLabels[pane_id[1:]] = pane_id[1:] . ' ' . command
+	endfor
+
+	return [head, windowLabels]
+endfunction
 " }}}
 
 " TODO Try to do some templating macro magic conditional compilation
@@ -261,7 +274,7 @@ endfunction
 
 function! asyncrun#SendText(pane_id, text) abort
 	" echom 'pane_id: ' . a:pane_id . ' text: ' . a:text
-	call asyncrun#SendKeys({'pane': a:pane_id}, s:tmux_reset_seq . shellescape(a:text) . ' Enter')
+	call asyncrun#SendKeys({'pane': a:pane_id}, s:tmux_reset_seq . shellescape(a:text))
 endfunction
 
 " TODO Try to make it into one unified function for operator in visual/normal
@@ -276,4 +289,14 @@ function! asyncrun#SlimeOperator(type, ...) abort
 	" XXX Maybe use tmux paste-buffer for large texts
 	" TODO (Optionally) Strip leading whitespace and empty lines
 	call asyncrun#PromptWindow({pane_id -> asyncrun#SendText(pane_id, text)})
+endfunction
+
+function! asyncrun#WindowComplete(A, L, P) abort
+	" Cannot open windows with command-line window open, so do not
+	if empty(getcmdwintype())
+		call asyncrun#PromptWindow({->0})
+		redraw!
+		autocmd asyncrunprompt CmdlineLeave <buffer> quit | autocmd! asyncrunprompt
+	endif
+	return ''
 endfunction
