@@ -265,7 +265,7 @@ function! asyncrun#PromptWindow(Cb) abort
 	let virtualedit = &virtualedit | set virtualedit=all " Enable 'virtualedit'
 	silent normal! ggdGg$
 	let [w, h] = [virtcol('.'), winheight(0)]
-	for i in range(h - 1) | call append(0, '') | endfor " Fill buffer with lines
+	call append(0, map(range(h - 1), '""')) " Fill buffer with lines
 	silent call DrawCell(head, 1, 1, w, h, windowLabels)
 	let &virtualedit = virtualedit " Restore 'virtualedit'
 	setlocal nomodifiable
