@@ -2,7 +2,7 @@
 "
 " Functions like the attribute -bar was given however | runs in a synchronous
 " context.
-command -nargs=1 AsyncRun call asyncrun#AsyncRunCommand(<q-args>, <q-mods>)
+command -nargs=1 -complete=customlist,asyncrun#AsyncRunComplete AsyncRun call asyncrun#AsyncRunCommand(<q-args>, <q-mods>)
 
 " TODO Add :Make command (asynchronous version of :make)
 
