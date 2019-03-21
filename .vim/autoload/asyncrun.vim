@@ -54,9 +54,14 @@ endfunction
 " Required to associate requests with Quickfix window
 if !exists('s:requestsByFile') | let s:requestsByFile = {} | endif
 
-" Either provide a target or it will create a short-lived one
+" Either provide a target or it will create a short-lived one.
+" Returns -1 in case of an error.
 "
 " TODO Consider respawn-window etc.
+"
+" TODO Add option to show pause prompt, and option to switch back to Vim when
+" program exits, and fix option to focus
+" and not capture output
 function! asyncrun#Run(request) abort
 	if &autowrite || &autowriteall | silent! wall | endif
 
@@ -72,16 +77,16 @@ function! asyncrun#Run(request) abort
 	endif
 
 	let a:request.file = tempname()
-	let outfile = a:request.file
-	let s:requestsByFile[outfile] = a:request
+	let s:requestsByFile[a:request.file] = a:request
 	let a:request.isshell = isshell
 
 	if isshell
 		call s:SetupCallback(a:request)
 		" Add a delay to avoid race conditions
 		let sleep = 'sync; ' . (executable('perl') ? 'perl -e "select(undef,undef,undef,0.1)" 2>/dev/null' : 'sleep 1') . '; '
-		let script = s:Isolate(a:request, ['TMUX', 'TMUX_PANE'], sleep . a:request.cmd
-					\ . '; echo ' . s:exitstatus  . ' > ' . fnameescape(outfile . '.complete'))
+		let pause = a:request.qf || target ? '' : "; read -n 1 -srp '\e[1mPress ENTER or type command to continue\e[0m'; echo"
+		let script = s:Isolate(a:request, ['TMUX', 'TMUX_PANE'], (empty(target) ? sleep : '') . a:request.cmd
+					\ . '; echo ' . s:exitstatus  . ' > ' . fnameescape(a:request.file . '.complete') . pause)
 
 		let a:request.lines = [script]
 	else
@@ -92,16 +97,17 @@ function! asyncrun#Run(request) abort
 		let script = join(lines, "\n")
 	endif
 
-	let uname = system('uname')[0:-2]
+	let uname = system('uname')[:-2]
 	let filter = uname ==# 'Darwin' ? '/usr/bin/sed -l' : 'sed' . (uname ==# 'Linux' ? ' -u' : '')
 	let filter .= " -e \"s/\x1b\[[0-9;]*[mGKHFJ]\\| \\?\r//g\"" " Remove ANSI escape sequences and newlines (from text wrap)
-	let filter = shellescape(filter . ' > ' . outfile)
+	let filter = shellescape(filter . ' > ' . a:request.file)
 
+	let focus = get(a:request, 'focus', 0)
 	if empty(target)
 		" TODO Only not focus if we can poll effectively
 		" Requires the operating system to support /dev/fd
 		let a:request.target = system('tmux ' . (get(a:request, 'background', 0) ? 'new-window' : 'split-window')
-					\ . ' ' . (get(a:request, 'focus', 0) ? '' : '-d')
+					\ . ' ' . (focus ? '' : '-d')
 					\ . ' ' . (get(a:request, 'vertical', 0) ? '-v' : '-h')
 					\ . ' -PF "#{pane_id}" ' . shellescape('exec ' . script)
 					\ . ' | { tee /dev/fd/3 | xargs -I {} tmux pipe-pane -t {} ' . filter
@@ -114,7 +120,8 @@ function! asyncrun#Run(request) abort
 		" Send dummy Enter to detect prompt
 		call system('tmux send-keys -t ' . target . ' ' . s:tmux_reset_seq
 					\ . '; tmux pipe-pane -t ' . target . ' ' . filter
-					\ . '; tmux send-keys -t ' . target . ' Enter ' . shellescape(script . "\n"))
+					\ . '; tmux send-keys -t ' . target . ' Enter ' . shellescape(script . "\n")
+					\ . (focus ? '; tmux select-pane -t ' . target : ''))
 
 		if !isshell | call s:PollRepl(a:request) | endif
 	endif
@@ -186,9 +193,9 @@ function! s:OnComplete(request, status) abort
 	endif
 
 	" Populate quickfix window
-	execute 'cgetfile ' a:request.file
-	echo (a:status > 0 ? 'Failure:' :  a:status < 0 ? 'Completed:' : 'Success:') '!' . a:request.cmd
+	execute 1 ? 'cfile' : 'cgetfile' a:request.file
 	redraw!
+	echo (a:status > 0 ? 'Failure:' :  a:status < 0 ? 'Completed:' : 'Success:') '!' . join(split(a:request.cmd, '\n'))
 
 	" botright copen " Open quickfix window TODO: Remove
 	" wincmd p " Go to previous window
@@ -212,6 +219,12 @@ function! s:SetupCallback(request) abort
 	else
 		return ''
 	endif
+endfunction
+
+" Returns the compiler plugin corresponding to the specified command
+function! s:GetCompiler(cmd) abort
+	let plugins = map(reverse(split(globpath(&runtimepath, 'compiler/*.vim'), "\n")),
+				\ {i, file -> [fnamemodify(file, ':t:r'), readfile(file)]}) " Store filename without extension
 endfunction
 
 " Setting Quickfix window title requires it being open so do it here instead
@@ -274,7 +287,9 @@ function! asyncrun#PromptWindow(Cb) abort
 	function! s:WindowSelectEnter() abort
 		let word = expand('<cword>') " Get word under cursor
 		if word =~# '\D' | return | endif
-		try | call b:Cb('%' . word) | finally | quit | endtry
+		let Cb = b:Cb
+		quit
+		call Cb('%' . word)
 	endfunction
 	nnoremap <script> <buffer> <nowait> <silent> <CR> :call <SID>WindowSelectEnter()<CR>
 	nnoremap <script> <buffer> <nowait> <silent> <C-n> /\d\+<CR>
@@ -294,7 +309,7 @@ let s:pending = {} " Dict of pane_id to requests which have yet to finish
 function! s:TmuxPoll() abort
 	if s:HasCallback() || empty(s:pending) | return | endif
 
-	let panes = split(system('tmux list-panes -a -F "#{pane_id}"'), '\n')
+	let panes = split(system('tmux list-panes -a -F "#{pane_id}"'), "\n")
 	for [pane, request] in items(s:pending)
 		if index(panes, pane) == -1
 			call remove(s:pending, pane)
@@ -327,7 +342,7 @@ function! s:TmuxWinlayout() abort
 	endwhile
 
 	" Get names of commands running in panes
-	let panes = split(system('tmux list-panes -F "#{pane_id}/#{pane_current_command}"'), '\n')
+	let panes = split(system('tmux list-panes -F "#{pane_id}/#{pane_current_command}"'), "\n")
 	let windowLabels = {}
 	for p in panes
 		let [pane_id, command] = split(p, '/')
@@ -358,6 +373,7 @@ function! asyncrun#AsyncRunCommand(args, mods) abort
 				\ 'target': target,
 				\ 'vertical': a:mods =~# 'vertical',
 				\ 'background': a:mods =~# 'tab',
+				\ 'qf': 1,
 				\ 'Cb': {s -> s || execute(after)}})}
 
 	" (Ab-)use the :browse modifier to prompt for target window
@@ -376,19 +392,6 @@ function! asyncrun#AsyncRunComplete(A, L, P) abort
 	else
 		return getcompletion(a:A, 'shellcmd')
 	endif
-endfunction
-
-" TODO Try to make it into one unified function for operator in visual/normal
-" and command with range
-" Enters the specified text into a REPL for example
-"
-" TODO Buffer-local variable for storing last target
-function! asyncrun#SlimeOperator(type, ...) abort
-	let sel_save = &selection | let &selection = "inclusive" | let reg_save = @@
-	" If invoked from Visual mode, use gv command.
-	silent execute 'normal! ' . (a:0 ? 'gv' : '`[' . (a:type ==# 'line' ? 'V': 'v') . '`]') . 'y'
-	let text = @@ | let &selection = sel_save | let @@ = reg_save
-	call asyncrun#PromptWindow({target -> asyncrun#Run({'target': target, 'cmd': text})})
 endfunction
 
 function! asyncrun#WindowComplete(A, L, P) abort
