@@ -18,6 +18,7 @@ set nohlsearch " Package maintainers keep meddling with the defaults
 
 silent! colorscheme apprentice
 let mapleader = "\<Space>"
+nnoremap Y y$| " Make Y behave like other capitals
 nnoremap <F5> :wall<Bar>make<CR>
 " Write with sudo from within Vim
 command! -bar W w !sudo tee % >/dev/null
