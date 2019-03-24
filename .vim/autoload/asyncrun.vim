@@ -79,6 +79,7 @@ function! asyncrun#Run(request) abort
 	let a:request.file = tempname()
 	let s:requestsByFile[a:request.file] = a:request
 	let a:request.isshell = isshell
+	let a:request.hadtarget = !empty(target) " TODO Rename
 
 	if isshell
 		call s:SetupCallback(a:request)
@@ -99,7 +100,8 @@ function! asyncrun#Run(request) abort
 
 	let uname = system('uname')[:-2]
 	let filter = uname ==# 'Darwin' ? '/usr/bin/sed -l' : 'sed' . (uname ==# 'Linux' ? ' -u' : '')
-	let filter .= " -e \"s/\x1b\[[0-9;]*[mGKHFJ]\\| \\?\r//g\"" " Remove ANSI escape sequences and newlines (from text wrap)
+	let filter .= " -e \"s/\x1b\[[0-9;]*[mGKHFJ]\\|\r*$//g\"" " Remove ANSI escape sequences and newlines (from text wrap)
+	if empty(target) | let filter .= " -e \"s/.*\r//\"" | endif
 	let filter = shellescape(filter . ' > ' . a:request.file)
 
 	let focus = get(a:request, 'focus', 0)
@@ -137,7 +139,9 @@ endfunction
 function! s:ParseReplPrompt(request) abort
 	if has_key(a:request, 'prompt') | return a:request.prompt | endif
 
-	let repl_lines = readfile(a:request.file, '', get(g:, 'asyncrun_max_prompt_lines', 2) + 1)[1:] " Skip first line (from Enter)
+	let repl_lines = readfile(a:request.file, 'b', get(g:, 'asyncrun_max_prompt_lines', 2) + 1)[1:] " Skip first line (from Enter)
+	" Remove characters from soft line breaks
+	let repl_lines = map(repl_lines, {i, v -> substitute(v, ' \r', '', 'g')})
 	" Detect everything up the first input line as the prompt
 	let [str, i, start, end] = matchstrpos(repl_lines, '\V\^\.\*\ze' . escape(a:request.lines[0], '\') . '\$')
 	if i == -1 | return [] | endif
@@ -176,8 +180,8 @@ function! s:OnComplete(request, status) abort
 	let target = a:request.target
 	call system('tmux pipe-pane -t ' . target) " Close the pipe
 
-	if !a:request.isshell
-		let lines = readfile(a:request.file)
+	if a:request.hadtarget
+		let lines = readfile(a:request.file, 'b')
 		let lines = lines[1:] " Skip first line (from Enter)
 		let prompt = s:ParseReplPrompt(a:request) | let prompt_len = len(prompt)
 		" Remove lines starting with prompt (i.e. input commands)
@@ -189,7 +193,8 @@ function! s:OnComplete(request, status) abort
 				let i += 1
 			endif
 		endwhile
-		call writefile(lines, a:request.file)
+		let lines = map(lines, {i, v -> substitute(v, '.*\r', '', '')}) " Handle CR:s
+		call writefile(lines, a:request.file, 'b')
 	endif
 
 	" Populate quickfix window
@@ -229,7 +234,7 @@ endfunction
 
 " Setting Quickfix window title requires it being open so do it here instead
 function! s:InitQuickfix() abort
-	let file = trim(matchstr(w:quickfix_title, '^:cgetfile \zs.*$'))
+	let file = trim(matchstr(w:quickfix_title, '^:\%(cfile\|cgetfile\) \zs.*$'))
 	if !empty(file)
 		let request = s:requestsByFile[file]
 		let w:quickfix_title = '!' . request.cmd
