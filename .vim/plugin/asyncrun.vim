@@ -15,8 +15,8 @@ function! s:SlimeOperator(...) abort
 	let this = expand('<sfile>')[9:] " The name of this function
 	if !a:0 && mode() ==# 'n'
 		return ':set operatorfunc=' . this . "\<CR>g@"
-	elseif mode() ==# 'v'
-		return ":\<C-U>call " . this . "(visualmode(), 0)\<CR>"
+	elseif mode() =~# "v\\|V\\|\<C-V>"
+		return ":\<C-U>call " . this . "(visualmode())\<CR>"
 	endif
 
 	let sel_save = &selection | let &selection = "inclusive" | let reg_save = @@

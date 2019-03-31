@@ -85,7 +85,7 @@ function! asyncrun#Run(request) abort
 		call s:SetupCallback(a:request)
 		" Add a delay to avoid race conditions
 		let sleep = 'sync; ' . (executable('perl') ? 'perl -e "select(undef,undef,undef,0.1)" 2>/dev/null' : 'sleep 1') . '; '
-		let pause = a:request.qf || target ? '' : "; read -n 1 -srp '\e[1mPress ENTER or type command to continue\e[0m'; echo"
+		let pause = a:request.qf || !empty(target) ? '' : "; read -n 1 -srp '\e[1mPress ENTER or type command to continue\e[0m'; echo"
 		let script = s:Isolate(a:request, ['TMUX', 'TMUX_PANE'], (empty(target) ? sleep : '') . a:request.cmd
 					\ . '; echo ' . s:exitstatus  . ' > ' . fnameescape(a:request.file . '.complete') . pause)
 
