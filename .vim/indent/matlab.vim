@@ -104,7 +104,7 @@ function! GetMatlabIndent()
 	else
 		" Count how many blocks the previous line opens/closes
 		" Line continuations/brackets indent once per statement
-		let result = indent(prevlnum) + shiftwidth() * (open - close
+		let result = (prevlnum > 0) * indent(prevlnum) + shiftwidth() * (open - close
 					\ + (b:MATLAB_bracketlevel ? -!curbracketlevel : !!curbracketlevel)
 					\ + (curbracketlevel <= 0) * (above_lc - b:MATLAB_waslc))
 	endif
