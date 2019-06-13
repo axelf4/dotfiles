@@ -28,7 +28,7 @@ if exists("*GetMatlabIndent") | finish | endif
 let s:keepcpo = &cpo
 set cpo&vim
 
-let s:end = '\<end\>\%([^(]*)\)\@!' " Array indexing heuristic
+let s:end = '\<end\>\%([^({]*[)}]\)\@!' " Array indexing heuristic
 let s:open_pat = 'for\|if\|parfor\|spmd\|switch\|try\|while\|classdef\|properties\|methods\|events\|enumeration'
 let s:dedent_pat = '\C^\s*\zs\<\%(end\|else\|elseif\|catch\|\(case\|otherwise\|function\)\)\>'
 let s:start_pat = '\C\<\%(function\|' . s:open_pat . '\)\>'
