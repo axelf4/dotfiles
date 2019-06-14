@@ -18,6 +18,10 @@ setlocal comments=:%
 setlocal commentstring=%%s
 setlocal formatoptions+=ronl
 
+if exists('&omnifunc')
+	setlocal omnifunc=matlab#CompleteMatlab
+endif
+
 " Jumps to the next/previous code section.
 function! s:NextSection(mode, backwards)
 	if a:mode ==# 'v'
@@ -41,7 +45,7 @@ xnoremap <script> <silent> <buffer> [[ :call <SID>NextSection('v', 1)<CR>
 onoremap <script> <silent> <buffer> ]] :call <SID>NextSection('o', 0)<CR>
 onoremap <script> <silent> <buffer> [[ :call <SID>NextSection('o', 1)<CR>
 
-let b:undo_ftplugin = "setlocal suffixesadd< suffixes< comments< commentsstring< formatoptions<
+let b:undo_ftplugin = "setlocal suffixesadd< suffixes< comments< commentsstring< formatoptions< omnifunc<
 			\ | nunmap <buffer> [[
 			\ | nunmap <buffer> ]]
 			\ | xunmap <buffer> [[
