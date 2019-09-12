@@ -39,4 +39,5 @@ endif
 let delimitMate_expand_cr = 1
 let delimitMate_balance_matchpairs = 1
 
+let r_indent_align_args = 0 " No R function argument aligning
 let g:rustfmt_autosave = 1
