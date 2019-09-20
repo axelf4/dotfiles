@@ -37,7 +37,7 @@ let s:zflag = has('patch-7.4.984') ? 'z' : ''
 
 " Returns whether a comment or string envelops the specified column.
 function! s:IsCommentOrString(lnum, col)
-	return synIDattr(synID(a:lnum, a:col, 1), "name") =~# 'matlabComment\|matlabMultilineComment\|matlabString'
+	return synIDattr(synID(a:lnum, a:col, 1), "name") =~# 'matlabComment\|matlabMultilineComment\|matlabCellComment\|matlabString'
 endfunction
 
 " Returns whether the specified line continues on the next line.
