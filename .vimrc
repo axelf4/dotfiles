@@ -23,6 +23,9 @@ nnoremap Y y$| " Make Y behave like other capitals
 nnoremap <F5> :wall<Bar>make<CR>
 " Write with sudo from within Vim
 command! -bar W w !sudo tee % >/dev/null
+" Repeat g; if the cursor is already at the previous change
+nnoremap <expr> g; {l, c -> l[0]->get(l[1] - 1, {}) == #{lnum: c[1], col: c[2] - 1,
+			\ coladd: c[3]}}(getchangelist(), getcurpos()) + 1 .. 'g;'
 augroup vimrc
 	autocmd!
 	" Automatically remove trailing whitespace
