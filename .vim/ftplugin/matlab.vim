@@ -18,6 +18,11 @@ setlocal comments=:%
 setlocal commentstring=%%s
 setlocal formatoptions+=ronl
 
+setlocal include=^\\s*import
+setlocal includeexpr=substitute(v:fname,'\\(\\w\\+\\)\\.','+\\1/','g')
+
+setlocal tagfunc=matlab#Tagfunc
+
 if exists('&omnifunc')
 	setlocal omnifunc=matlab#CompleteMatlab
 endif

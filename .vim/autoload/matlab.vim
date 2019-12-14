@@ -2,6 +2,52 @@
 " Language: MATLAB
 " Maintainer: Axel Forsman (axelsfor@gmail.com)
 
+function! s:Includeexpr(fname) abort
+	return substitute(a:fname, '\(\w\+\)\.', '+\1/', 'g')
+endfunction
+
+function! matlab#Tagfunc(pattern, flags, info) abort
+	" See https://se.mathworks.com/help/matlab/matlab_prog/function-precedence-order.html
+
+	let result = []
+
+	let pattern = match(a:flags, 'c\|i') isnot -1
+				\ ? matchstr(getline('.'), '[0-9A-Za-z.]*\%' . col('.') . 'c[0-9A-Za-z.]*')
+				\ : a:pattern
+	let isonlyident = pattern !~# '\.'
+
+	" Find imports
+	let imports = []
+	call cursor(1, 1)
+	while search(&include . '\s\+', 'eW') isnot 0
+		call extend(imports, split(getline('.')[col('.'):]))
+		normal j
+	endwhile
+
+	for import in add(map(filter(imports,
+				\ {i, v -> v =~# '\.\*' || isonlyident && v =~# '\.' . pattern . '$'}),
+				\ {i, v -> strpart(v, 0, strridx(v, '.') + 1)}),
+				\ '')
+		let name = s:Includeexpr(import . pattern)
+		if match(a:flags, 'i') isnot -1 | let name .= '*' | endif
+		let name .= '.m'
+		call extend(result, map(extend(
+					\ glob(substitute(name, '/\zs.*\ze\.m$', '@&/&', ''), v:false, v:true),
+					\ glob(name, v:false, v:true)),
+					\ {i, v -> {'name': a:pattern, 'filename': v, 'cmd': '1'}}))
+	endfor
+
+	if isonlyident
+		if search('function\s\+' . pattern) != 0
+			call add(result, {'name': pattern, 'filename': a:info.buf_ffname, 'cmd': string(line('.'))})
+		endif
+	endif
+
+	echom result
+
+	return result
+endfunction
+
 " Vim completion function for MATLAB function names.
 function! matlab#CompleteMatlab(findstart, base) abort
 	if a:findstart
