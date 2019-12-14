@@ -2,7 +2,9 @@
 	name = Axel Forsman
 	email = axelsfor@gmail.com
 [core]
-	# whitespace = fix,-indent-with-non-tab,trailing-space,cr-at-eol
-	excludesfile = ~/.gitignore
+	excludesFile = ~/.gitignore
 [push]
 	default = simple
+
+[url "git@github.com:"]
+	insteadOf = "gh:"
