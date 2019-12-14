@@ -3,7 +3,7 @@
 " Maintainer: Axel Forsman (axelsfor@gmail.com)
 
 " Vim completion function for MATLAB function names.
-function! matlab#CompleteMatlab(findstart, base)
+function! matlab#CompleteMatlab(findstart, base) abort
 	if a:findstart
 		" A valid MATLAB identifier is a character vector of alphanumerics
 		" (A–Z, a–z, 0–9) and underscores, such that the first character is a letter

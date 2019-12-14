@@ -45,7 +45,7 @@ xnoremap <script> <silent> <buffer> [[ :call <SID>NextSection('v', 1)<CR>
 onoremap <script> <silent> <buffer> ]] :call <SID>NextSection('o', 0)<CR>
 onoremap <script> <silent> <buffer> [[ :call <SID>NextSection('o', 1)<CR>
 
-let b:undo_ftplugin = "setlocal suffixesadd< suffixes< comments< commentsstring< formatoptions< omnifunc<
+let b:undo_ftplugin = "setlocal suffixesadd< suffixes< comments< commentstring< formatoptions< omnifunc<
 			\ | nunmap <buffer> [[
 			\ | nunmap <buffer> ]]
 			\ | xunmap <buffer> [[
