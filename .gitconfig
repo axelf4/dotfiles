@@ -1,8 +1,6 @@
 [user]
 	name = Axel Forsman
 	email = axelsfor@gmail.com
-[core]
-	excludesFile = ~/.gitignore
 [push]
 	default = simple
 
