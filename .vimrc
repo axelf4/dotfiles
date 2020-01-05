@@ -3,6 +3,7 @@ Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
 " Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
 Plug 'Raimondi/delimitMate' " Auto closing of brackets, etc.
+Plug 'axelf4/vim-strip-trailing-whitespace'
 Plug 'mattn/emmet-vim'
 
 Plug 'rust-lang/rust.vim'
@@ -28,8 +29,6 @@ nnoremap <expr> g; {l, c -> l[0]->get(l[1] - 1, {}) == #{lnum: c[1], col: c[2] -
 			\ coladd: c[3]}}(getchangelist(), getcurpos()) + 1 .. 'g;'
 augroup vimrc
 	autocmd!
-	" Automatically remove trailing whitespace
-	autocmd BufWritePre * %s/\s\+$//e
 augroup END
 
 let ctrlp_working_path_mode = 0
