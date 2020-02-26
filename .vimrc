@@ -5,6 +5,7 @@ Plug 'ctrlpvim/ctrlp.vim'
 Plug 'Raimondi/delimitMate' " Auto closing of brackets, etc.
 Plug 'axelf4/vim-strip-trailing-whitespace'
 Plug 'mattn/emmet-vim'
+Plug 'junegunn/goyo.vim'
 
 Plug 'rust-lang/rust.vim'
 Plug 'pangloss/vim-javascript'
