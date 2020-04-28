@@ -9,6 +9,7 @@ Plug 'junegunn/goyo.vim'
 
 Plug 'rust-lang/rust.vim'
 Plug 'pangloss/vim-javascript'
+Plug 'JuliaEditorSupport/julia-vim'
 call plug#end()
 
 set backspace=indent,eol,start " Allow backspace in insert mode
