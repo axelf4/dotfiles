@@ -17,6 +17,7 @@ set tabstop=4 shiftwidth=0 noexpandtab " 4 columns wide tabs
 set hidden " Hide buffers instead of unloading them
 set wildmenu wildmode=longest:full,full " Enhance command-line completion
 set incsearch ignorecase smartcase " Matches as you type, case-insensitive without capitals
+set nojoinspaces " No double spaces between sentences
 set splitbelow splitright
 set nohlsearch " Package maintainers keep meddling with the defaults
 
