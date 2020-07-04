@@ -19,6 +19,7 @@ set wildmenu wildmode=longest:full,full " Enhance command-line completion
 set incsearch ignorecase smartcase " Matches as you type, case-insensitive without capitals
 set nojoinspaces " No double spaces between sentences
 set splitbelow splitright
+set cpoptions+=M " Fix Haskell lambda with tuple pattern messing with "%"
 set nohlsearch " Package maintainers keep meddling with the defaults
 
 silent! colorscheme apprentice
