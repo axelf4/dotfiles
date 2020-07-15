@@ -9,6 +9,7 @@ Plug 'mattn/emmet-vim'
 Plug 'junegunn/goyo.vim'
 
 Plug 'rust-lang/rust.vim'
+Plug 'axelf4/vim-haskell'
 Plug 'pangloss/vim-javascript'
 Plug 'JuliaEditorSupport/julia-vim'
 call plug#end()
