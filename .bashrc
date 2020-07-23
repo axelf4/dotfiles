@@ -23,4 +23,8 @@ PS1='\[\033[36m\]\w\[\033[1;31m\]$(prompt_git)\[\033[0m\] ❯ '
 alias ..="cd .."
 alias ...="cd ../.."
 
+# Make ^Z toggle between fore-/background
+stty susp undef
+bind -x '"\C-z": fg'
+
 alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
