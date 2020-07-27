@@ -37,13 +37,13 @@ augroup END
 
 let ctrlp_working_path_mode = 0
 let ctrlp_use_caching = 0
-if executable("rg")
-	set grepprg=rg\ --vimgrep\ --no-heading\ --smart-case
-	let ctrlp_user_command = 'rg %s --files --color=never --glob ""'
+if executable('rg')
+	set grepprg=rg\ --vimgrep\ --smart-case
+	let ctrlp_user_command = 'rg --color=never --files %s'
 endif
 
 let delimitMate_expand_cr = 1
 let delimitMate_balance_matchpairs = 1
 
 let r_indent_align_args = 0 " No R function argument aligning
-let g:rustfmt_autosave = 1
+let rustfmt_autosave = 1
