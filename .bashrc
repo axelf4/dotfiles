@@ -24,7 +24,6 @@ alias ..="cd .."
 alias ...="cd ../.."
 
 # Make ^Z toggle between fore-/background
-stty susp undef
-bind -x '"\C-z": fg'
+if [[ $- == *i* ]]; then stty susp undef; bind -x '"\C-z": fg'; fi
 
 alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
