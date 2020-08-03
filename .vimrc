@@ -3,6 +3,7 @@ Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
 " Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
 Plug 'Raimondi/delimitMate' " Auto closing of brackets, etc.
+Plug 'editorconfig/editorconfig-vim'
 Plug 'axelf4/vim-strip-trailing-whitespace'
 Plug 'mattn/emmet-vim'
 Plug 'junegunn/goyo.vim'
