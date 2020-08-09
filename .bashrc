@@ -16,7 +16,7 @@ function prompt_git() {
 		|| echo 'unknown')"
 }
 
-PS1='\[\033[36m\]\w\[\033[1;31m\]$(prompt_git)\[\033[0m\] ❯ '
+PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
 alias ..="cd .."
 alias ...="cd ../.."
