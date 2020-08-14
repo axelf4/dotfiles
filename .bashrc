@@ -1,7 +1,6 @@
 export EDITOR=vim # Set Vim as the default editor
 HISTIGNORE="&:??: *:pwd:clear:exit"
-# Automatically trim long paths in the prompt (requires Bash 4.x)
-PROMPT_DIRTRIM=2
+PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
 
 function prompt_git() {
 	# Check if we're in a git repo. (fast)
@@ -11,11 +10,10 @@ function prompt_git() {
 	#   then… get a tracking remote branch or tag
 	#   otherwise… get the short SHA for the latest commit
 	#   lastly just give up.
-	echo " $(git symbolic-ref --quiet --short HEAD 2> /dev/null || \
-		git describe --all --exact-match HEAD 2> /dev/null || \
-		git rev-parse --short HEAD 2> /dev/null || \
-		echo 'unknown')";
-	return
+	echo " $(git symbolic-ref --quiet --short HEAD 2> /dev/null \
+		|| git describe --all --exact-match HEAD 2> /dev/null \
+		|| git rev-parse --short HEAD 2> /dev/null \
+		|| echo 'unknown')"
 }
 
 PS1='\[\033[36m\]\w\[\033[1;31m\]$(prompt_git)\[\033[0m\] ❯ '
@@ -23,7 +21,9 @@ PS1='\[\033[36m\]\w\[\033[1;31m\]$(prompt_git)\[\033[0m\] ❯ '
 alias ..="cd .."
 alias ...="cd ../.."
 
-# Make ^Z toggle between fore-/background
-if [[ $- == *i* ]]; then stty susp undef; bind -x '"\C-z": fg'; fi
+if [[ $- == *i* ]]; then
+	stty -ixon susp undef # Disable XON/XOFF flow control
+	bind -x '"\C-z": fg' # Make ^Z toggle between fore-/background
+fi
 
 alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
