@@ -1,6 +1,7 @@
-[._]*s[a-w][a-z]
+# Emacs lock, auto-save and backup files
+.#*
+\#*#
 *~
+
 tags
-# YouCompleteMe configurations
-.ycm_extra_conf.py
-.ycm_extra_conf.pyc
+.projectile
