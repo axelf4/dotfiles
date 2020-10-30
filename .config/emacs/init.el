@@ -10,6 +10,8 @@
 	  truncate-partial-width-windows nil ; Always soft-wrap
 	  show-paren-delay 0
 	  sentence-end-double-space nil ; Single space between sentences
+	  make-backup-files nil
+	  auto-save-no-message t
 	  vc-handled-backends nil) ; Disable VC
 (setq-default tab-width 4)
 (menu-bar-mode -1) ; Disable the menu bar
