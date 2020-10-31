@@ -2,18 +2,17 @@
 
 ## Installation
 
-```
+```sh
 git clone --bare https://github.com/axelf4/dotfiles.git $HOME/.dotfiles
 alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
 cfg checkout
 cfg config --local status.showUntrackedFiles no
 ```
 
-### Install vim-plug
+### Install [straight.el]
 
-```
-curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+```sh
+git clone https://github.com/raxod502/straight.el.git ~/.config/emacs/straight/repos/straight.el
 ```
 
 ## Bash startup files
@@ -47,3 +46,5 @@ create a `.bash_profile` with
 ```
 Note however that it is then necessary to test if interactive (with `$-`)
 before trying to change terminal settings.
+
+[straight.el]: https://github.com/raxod502/straight.el
