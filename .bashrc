@@ -1,5 +1,5 @@
-export EDITOR=vim # Set Vim as the default editor
-HISTIGNORE="&:??: *:pwd:clear:exit"
+export EDITOR='emacs --no-window-system' # Set Emacs as the default editor
+HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
 
 function prompt_git() {
@@ -18,12 +18,13 @@ function prompt_git() {
 
 PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
-alias ..="cd .."
-alias ...="cd ../.."
+alias e='$EDITOR'
+alias ..='cd ..'
+alias ...='cd ../..'
 
 if [[ $- == *i* ]]; then
 	stty -ixon susp undef # Disable XON/XOFF flow control
 	bind -x '"\C-z": fg' # Make ^Z toggle between fore-/background
 fi
 
-alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
+alias cfg='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
