@@ -45,9 +45,9 @@
   (kbd "C-a") 'evil-numbers/inc-at-pt
   (kbd "C-x") 'evil-numbers/dec-at-pt)
 
-;; c_CTRL-U
-(define-key minibuffer-local-map
-  (kbd "C-u") 'evil-delete-back-to-indentation)
+;; Inherit command-line mappings in minibuffers
+(set-keymap-parent minibuffer-local-map evil-ex-completion-map)
+(define-key minibuffer-local-map [remap completion-at-point] nil) ; but undo remapping...
 
 (evil-set-initial-state 'help-mode 'normal)
 (evil-define-key 'normal help-mode-map (kbd "C-t") 'help-go-back)
