@@ -8,8 +8,9 @@
 	  enable-recursive-minibuffers t
 	  scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
 	  truncate-partial-width-windows nil ; Always soft-wrap
-	  show-paren-delay 0
+	  select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
 	  sentence-end-double-space nil ; Single space between sentences
+	  show-paren-delay 0
 	  make-backup-files nil
 	  auto-save-no-message t
 	  vc-handled-backends nil) ; Disable VC
@@ -51,6 +52,10 @@
 
 (evil-set-initial-state 'help-mode 'normal)
 (evil-define-key 'normal help-mode-map (kbd "C-t") 'help-go-back)
+
+;; System clipboard support while running in terminal
+(straight-use-package 'xclip)
+(xclip-mode)
 
 ;; Fuzzy finding
 (straight-use-package 'selectrum)
