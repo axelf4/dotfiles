@@ -65,6 +65,7 @@
 
 ;; Project management
 (straight-use-package 'projectile)
+(setq projectile-completion-system 'default) ; Selectrum enhances default completion
 (projectile-mode 1)
 (evil-define-key 'normal projectile-mode-map
   (kbd "<leader>p") 'projectile-command-map)
