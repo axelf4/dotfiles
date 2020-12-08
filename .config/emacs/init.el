@@ -55,7 +55,8 @@
 
 ;; System clipboard support while running in terminal
 (straight-use-package 'xclip)
-(xclip-mode)
+(ignore-error file-error ; Silence missing backend error
+  (xclip-mode))
 
 ;; Fuzzy finding
 (straight-use-package 'selectrum)
