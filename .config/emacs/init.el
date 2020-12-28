@@ -104,3 +104,13 @@
 ;; Colorscheme
 (straight-use-package 'gruvbox-theme)
 (load-theme 'gruvbox t)
+
+;; Language support
+(straight-use-package 'rust-mode)
+(setq rust-format-on-save t)
+(add-hook 'rust-mode-hook
+		  (lambda () (setq indent-tabs-mode nil)))
+
+(straight-use-package 'haskell-mode)
+
+(straight-use-package 'nix-mode)
