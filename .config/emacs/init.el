@@ -34,6 +34,7 @@
  evil-want-C-u-scroll t
  evil-search-module 'evil-search
  evil-ex-search-highlight-all nil ; No hlsearch
+ evil-ex-substitute-case 'sensitive
  evil-toggle-key "" ; Do not map CTRL-Z
 
  evil-undo-system 'undo-tree
