@@ -3,6 +3,8 @@
 	email = axelsfor@gmail.com
 [push]
 	default = simple
+[pull]
+	ff = only
 
 [url "git@github.com:"]
 	insteadOf = "gh:"
