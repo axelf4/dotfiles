@@ -1,4 +1,4 @@
-export EDITOR='emacs --no-window-system' # Set Emacs as the default editor
+export VISUAL='emacsclient --alternate-editor= --tty' # Set Emacs as editor
 HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
 
@@ -18,7 +18,7 @@ function prompt_git() {
 
 PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
-alias e='$EDITOR'
+alias e='$VISUAL'
 alias ..='cd ..'
 alias ...='cd ../..'
 
