@@ -53,6 +53,7 @@
 
 (evil-set-initial-state 'help-mode 'normal)
 (evil-define-key 'normal help-mode-map (kbd "C-t") 'help-go-back)
+(define-key key-translation-map (kbd "<leader>h") "\C-h")
 
 ;; System clipboard support while running in terminal
 (straight-use-package 'xclip)
@@ -64,43 +65,61 @@
 (straight-use-package 'selectrum-prescient)
 (selectrum-mode 1)
 (selectrum-prescient-mode 1)
+(setq selectrum-extend-current-candidate-highlight t)
 
 ;; Project management
-(straight-use-package 'projectile)
-(setq projectile-completion-system 'default) ; Selectrum enhances default completion
-(projectile-mode 1)
-(evil-define-key 'normal projectile-mode-map
-  (kbd "<leader>p") 'projectile-command-map)
+(set-frame-parameter nil 'cwd default-directory) ; For the initial frame
+(push 'cwd frame-inherited-parameters)
+(add-hook
+ 'server-after-make-frame-hook
+ (lambda ()
+   (set-frame-parameter
+    nil 'cwd (process-get (frame-parameter nil 'client) 'server-client-directory))))
+
+(defun project-root ()
+  "Get the frame-local current working directory."
+  (frame-parameter nil 'cwd))
+
+(add-hook 'find-file-hook
+          (lambda () (setq default-directory (project-root))))
+
+(let ((find-files-program (cond
+                           ((executable-find "rg") '("rg" "--color=never" "--files"))
+                           ((executable-find "find") '("find" "-type" "f")))))
+  (defun find-file-rec ()
+    "Find a file in the current working directory recursively."
+    (interactive)
+    (let ((default-directory (project-root)))
+      (find-file
+       (completing-read
+        "Find file: " (apply #'process-lines find-files-program))))))
+
+(evil-define-key 'normal 'global
+  (kbd "<leader>f") 'find-file-rec)
 
 ;; Customize mode line
 (setq-default
  mode-line-buffer-identification
  '(:eval
    (if (buffer-file-name)
-	   (let* ((dir (file-name-directory buffer-file-name))
-			  (dir (if-let (project-root (projectile-project-root))
-					   (string-remove-prefix project-root dir)
-					 ;; Abbreviate $HOME
-					 (replace-regexp-in-string
-					  (concat "\\`" (regexp-quote (expand-file-name "~"))) "~" dir)))
-			  (parts (split-string dir "/" nil)))
-		 (list
-		  (if (> (length parts) 3)
-			  (string-join `(,(car parts) "..." . ,(last parts 2)) "/")
-			dir)
-		  (propertize (file-name-nondirectory (buffer-file-name))
-					  'face 'mode-line-buffer-id)))
-	 (propertize (buffer-name) 'face 'mode-line-buffer-id))))
-(setq-default
+       (let* ((dir (abbreviate-file-name
+                    (string-remove-prefix (project-root)
+                                          (file-name-directory buffer-file-name))))
+              (parts (split-string dir "/")))
+         (list
+          (if (> (length parts) 4)
+              (string-join `(,(car parts) "..." . ,(last parts 2)) "/") dir)
+          (propertize (file-name-nondirectory (buffer-file-name))
+                      'face 'mode-line-buffer-id)))
+     (propertize (buffer-name) 'face 'mode-line-buffer-id)))
+ mode-line-modified '(:eval (when (buffer-modified-p) " [+]"))
  mode-line-format
  '("%e " ; Out-of-memory indication
-   mode-line-buffer-identification
-   (:eval (when (buffer-modified-p) " [+]"))
+   mode-line-buffer-identification mode-line-modified
    ;; Right-justified line and column number
-   (:eval (let* ((rhs (format-mode-line "%l,%C "))
-				 (hpos (- (window-width) (string-width rhs))))
-			(list (propertize " " 'display `(space :align-to ,hpos)) rhs)))
-   ))
+   (:eval (let* ((rhs (format-mode-line "%l,%C"))
+                 (hpos (- (window-width) (string-width rhs) 1)))
+            (list (propertize " " 'display `(space :align-to ,hpos)) rhs)))))
 
 ;; Colorscheme
 (straight-use-package 'gruvbox-theme)
