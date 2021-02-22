@@ -107,6 +107,8 @@
 (load-theme 'gruvbox t)
 
 ;; Language support
+(add-hook 'emacs-lisp-mode-hook (lambda () (setq indent-tabs-mode nil)))
+
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
 (add-hook 'rust-mode-hook
