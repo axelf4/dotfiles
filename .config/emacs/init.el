@@ -50,6 +50,12 @@
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
 (define-key minibuffer-local-map [remap completion-at-point] nil) ; but undo remapping...
+;; Make Evil motions/text objects always use the default paragraph definition
+(advice-add 'forward-evil-paragraph :around
+            (lambda (orig-fun &rest args)
+              (let ((paragraph-start (default-value 'paragraph-start))
+                    (paragraph-separate (default-value 'paragraph-separate)))
+                (apply orig-fun args))))
 
 (evil-set-initial-state 'help-mode 'normal)
 (evil-define-key 'normal help-mode-map (kbd "C-t") 'help-go-back)
