@@ -36,6 +36,7 @@
  evil-ex-search-highlight-all nil ; No hlsearch
  evil-ex-substitute-case 'sensitive
  evil-toggle-key "" ; Do not map CTRL-Z
+ glc-default-span 1 ; Consider only immediately adjacent changes as the same
 
  evil-undo-system 'undo-tree
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
@@ -56,6 +57,16 @@
               (let ((paragraph-start (default-value 'paragraph-start))
                     (paragraph-separate (default-value 'paragraph-separate)))
                 (apply orig-fun args))))
+(define-key evil-normal-state-map [remap goto-last-change]
+  (lambda (arg)
+    "Go to penultimate change with cursor already on the last."
+    (interactive "P")
+    (setq this-command 'goto-last-change)
+    (let ((old-pos (point)))
+          (goto-last-change arg)
+          (when (<= (abs (- old-pos (point))) glc-default-span)
+            (setq last-command this-command)
+            (goto-last-change arg)))))
 
 (evil-set-initial-state 'help-mode 'normal)
 (evil-define-key 'normal help-mode-map (kbd "C-t") 'help-go-back)
