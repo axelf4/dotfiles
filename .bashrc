@@ -1,4 +1,4 @@
-export VISUAL='emacsclient --alternate-editor= --tty' # Set Emacs as editor
+export VISUAL='emacsclient --alternate-editor= --tty --' # Set Emacs as editor
 HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
 
