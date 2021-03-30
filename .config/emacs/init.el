@@ -17,12 +17,16 @@
 (setq-default tab-width 4)
 (menu-bar-mode -1) ; Disable the menu bar
 (show-paren-mode 1) ; Highlight matching parentheses
-(electric-pair-mode) ; Auto-pairing
 (global-set-key [escape] 'keyboard-escape-quit)
 (fset 'yes-or-no-p 'y-or-n-p)
 
 (straight-use-package 'undo-tree)
 (global-undo-tree-mode)
+
+(electric-pair-mode) ; Autopairing
+;; Inhibit autopairing in minibuffers
+(add-hook 'minibuffer-setup-hook
+          (lambda () (setq-local electric-pair-inhibit-predicate 'identity)))
 
 ;; vi emulation
 (straight-use-package 'evil)
