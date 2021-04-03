@@ -91,18 +91,18 @@
 ;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
 (push 'cwd frame-inherited-parameters)
-(add-hook
- 'server-after-make-frame-hook
- (lambda ()
-   (set-frame-parameter
-    nil 'cwd (process-get (frame-parameter nil 'client) 'server-client-directory))))
-
 (defun project-root ()
   "Get the frame-local current working directory."
   (frame-parameter nil 'cwd))
-
-(add-hook 'find-file-hook
-          (lambda () (setq default-directory (project-root))))
+(add-hook
+ 'server-after-make-frame-hook
+ (lambda ()
+   (let ((client (frame-parameter nil 'client)))
+     (set-frame-parameter nil 'cwd (process-get client 'server-client-directory))
+     ;; find-file-hook for files visited by client runs before frame creation
+     (dolist (buf (process-get client 'buffers))
+       (with-current-buffer buf (setq default-directory (project-root)))))))
+(add-hook 'find-file-hook (lambda () (setq default-directory (project-root))))
 
 (let ((find-files-program (cond
                            ((executable-find "rg") '("rg" "--color=never" "--files"))
@@ -113,7 +113,7 @@
     (let ((default-directory (project-root)))
       (find-file
        (completing-read
-        "Find file: " (apply #'process-lines find-files-program))))))
+        "Find file: " (apply 'process-lines find-files-program))))))
 
 (evil-define-key 'normal 'global
   (kbd "<leader>f") 'find-file-rec)
@@ -128,8 +128,8 @@
                                           (file-name-directory buffer-file-name))))
               (parts (split-string dir "/")))
          (list
-          (if (> (length parts) 4)
-              (string-join `(,(car parts) "..." . ,(last parts 2)) "/") dir)
+          (if (< (length parts) 5) dir
+            (string-join `(,(car parts) "..." . ,(last parts 2)) "/"))
           (propertize (file-name-nondirectory (buffer-file-name))
                       'face 'mode-line-buffer-id)))
      (propertize (buffer-name) 'face 'mode-line-buffer-id)))
