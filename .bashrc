@@ -18,13 +18,13 @@ function prompt_git() {
 
 PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
-alias e='$VISUAL'
-alias ..='cd ..'
-alias ...='cd ../..'
-
 if [[ $- == *i* ]]; then
 	stty -ixon susp undef # Disable XON/XOFF flow control
 	bind -x '"\C-z": fg' # Make ^Z toggle between fore-/background
 fi
 
+alias e='$VISUAL'
+alias ..='cd ..'
+alias ...='cd ../..'
 alias cfg='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
+alias ip='ip -color=auto' # Enable ip(8) color output
