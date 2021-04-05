@@ -20,9 +20,6 @@
 (global-set-key [escape] 'keyboard-escape-quit)
 (fset 'yes-or-no-p 'y-or-n-p)
 
-(straight-use-package 'undo-tree)
-(global-undo-tree-mode)
-
 (electric-pair-mode) ; Autopairing
 ;; Inhibit autopairing in minibuffers
 (add-hook 'minibuffer-setup-hook
@@ -30,6 +27,7 @@
 
 ;; vi emulation
 (straight-use-package 'evil)
+(straight-use-package 'undo-tree)
 (straight-use-package 'goto-chg)
 (straight-use-package 'evil-numbers)
 (setq
@@ -48,6 +46,7 @@
 
 (evil-mode 1)
 (evil-set-leader 'normal (kbd "SPC"))
+(add-hook 'evil-local-mode-hook 'undo-tree-mode)
 (evil-define-key 'normal 'global
   (kbd "C-a") 'evil-numbers/inc-at-pt
   (kbd "C-x") 'evil-numbers/dec-at-pt)
