@@ -41,8 +41,8 @@ To have have login shells too read the shell configuration file
 (e.g. because tmux always starts login shells),
 create a `.bash_profile` with
 ```bash
-[ -f ~/.profile ] && . ~/.profile
-[ -f ~/.bashrc ] && . ~/.bashrc
+[[ -f ~/.profile ]] && . ~/.profile
+[[ -f ~/.bashrc ]] && . ~/.bashrc
 ```
 Note however that it is then necessary to test if interactive (with `$-`)
 before trying to change terminal settings.
