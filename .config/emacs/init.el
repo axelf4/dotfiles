@@ -80,6 +80,11 @@
 (straight-use-package 'xclip)
 (ignore-error file-error ; Silence missing backend error
   (xclip-mode))
+(defun save-kill-ring (fun &rest args)
+  "Call FUN with ARGS and restore the kill ring afterward."
+  (let ((kill-ring kill-ring)) (apply fun args)))
+;; Pasting from system clipboard should not also copy the pasted text
+(advice-add 'current-kill :around #'save-kill-ring)
 
 ;; Fuzzy finding
 (straight-use-package 'selectrum)
