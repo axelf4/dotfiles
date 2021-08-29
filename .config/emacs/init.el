@@ -95,10 +95,13 @@
 
 ;;; Minibuffer completion
 (straight-use-package 'selectrum)
-(straight-use-package 'selectrum-prescient)
+(straight-use-package 'hotfuzz)
+(setq completion-ignore-case t
+      read-file-name-completion-ignore-case t
+      read-buffer-completion-ignore-case t
+      selectrum-extend-current-candidate-highlight t)
 (selectrum-mode)
-(selectrum-prescient-mode)
-(setq selectrum-extend-current-candidate-highlight t)
+(hotfuzz-selectrum-mode)
 
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
