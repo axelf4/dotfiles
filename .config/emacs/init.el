@@ -140,7 +140,7 @@
  '(:eval
    (if buffer-file-name
        (let* ((dir (abbreviate-file-name
-                    (string-remove-prefix (project-root)
+                    (string-remove-prefix (expand-file-name (project-root))
                                           (file-name-directory buffer-file-name))))
               (parts (split-string dir "/")))
          (list
@@ -150,14 +150,16 @@
                       'face 'mode-line-buffer-id)))
      (propertize (buffer-name) 'face 'mode-line-buffer-id)))
  mode-line-modified '(:eval (when (buffer-modified-p) " [+]"))
- mode-line-position "%l,%C"
+ mode-line-percent-position '(-3 "%o")
+ mode-line-position '("%l,%C " mode-line-percent-position)
  mode-line-format
  '("%e " ; Out-of-memory indication
    mode-line-buffer-identification mode-line-modified
-   ;; Right-justified line and column number
+   ;; Right-justified ruler
    (:eval (let* ((rhs (format-mode-line mode-line-position))
                  (hpos (- (window-width) (string-width rhs) 1)))
-            (list (propertize " " 'display `(space :align-to ,hpos)) rhs)))))
+            (propertize " " 'display `(space :align-to ,hpos))))
+   mode-line-position))
 
 ;;; Colorscheme
 (straight-use-package 'gruvbox-theme)
