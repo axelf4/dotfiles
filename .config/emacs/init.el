@@ -109,6 +109,12 @@
 (defun project-root ()
   "Get the frame-local current working directory."
   (frame-parameter nil 'cwd))
+(defun cd-to-project ()
+  "Make the project root the current buffer's default directory."
+  ;; Magit relies on the original default-directory value
+  (unless (and buffer-file-name
+               (equal (file-name-nondirectory buffer-file-name) "COMMIT_EDITMSG"))
+    (setq default-directory (project-root))))
 (add-hook
  'server-after-make-frame-hook
  (lambda ()
@@ -116,8 +122,8 @@
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory))
      ;; find-file-hook for files visited by client runs before frame creation
      (dolist (buf (process-get client 'buffers))
-       (with-current-buffer buf (setq default-directory (project-root)))))))
-(add-hook 'find-file-hook (lambda () (setq default-directory (project-root))))
+       (with-current-buffer buf (cd-to-project))))))
+(add-hook 'find-file-hook #'cd-to-project)
 
 (let ((find-files-program (cond
                            ((executable-find "rg") '("rg" "--color=never" "--files"))
@@ -188,14 +194,50 @@ mode buffer."
       (with-current-buffer buf (recompile))
     (call-interactively #'compile)))
 
-(evil-define-key 'motion 'global
-  (kbd "<leader>b") 'switch-to-buffer
-  (kbd "<leader>f") 'find-file-rec
-  [f9] 'compile-or-recompile)
-
 ;;; Colorscheme
 (straight-use-package 'gruvbox-theme)
 (load-theme 'gruvbox t)
+
+;;; Magit
+(straight-use-package 'magit)
+(setq git-commit-summary-max-length 50
+      git-commit-fill-column 72)
+(with-eval-after-load 'transient
+  (define-key transient-base-map [escape] 'transient-quit-one)
+  (define-key transient-sticky-map [escape] 'transient-quit-seq))
+(dolist (mode '(magit-status-mode
+                magit-log-mode
+                magit-log-select-mode
+                magit-revision-mode
+                magit-diff-mode
+                magit-process-mode
+                magit-stashes-mode))
+  (evil-set-initial-state mode 'motion))
+(evil-set-initial-state 'git-rebase-mode 'normal)
+(evil-define-key 'motion magit-mode-map
+  "gr" 'magit-refresh "gR" 'magit-refresh-all
+  [escape] 'magit-mode-bury-buffer
+  (kbd "RET") 'magit-visit-thing
+  (kbd "TAB") 'magit-section-toggle
+  (kbd "]]") 'magit-section-forward (kbd "[[") 'magit-section-backward
+  "J" 'magit-section-forward-sibling "K" 'magit-section-backward-sibling
+  "^" 'magit-section-up
+  "f" 'magit-fetch "F" 'magit-pull
+  "b" 'magit-branch "B" 'magit-bisect
+  "l" 'magit-log "\C-l" 'magit-log-refresh
+  "x" 'magit-delete-thing
+  "z" 'magit-stash
+  "g?" 'magit-dispatch
+  "!" 'magit-git-command
+  "+" 'magit-diff-more-context "-" 'magit-diff-less-context)
+
+(evil-define-key 'motion 'global
+  (kbd "<leader>b") 'switch-to-buffer
+  (kbd "<leader>f") 'find-file-rec
+  [f9] 'compile-or-recompile
+
+  (kbd "<leader>g") 'magit-status
+  (kbd "<leader>G") 'magit-file-dispatch)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
