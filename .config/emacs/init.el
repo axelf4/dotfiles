@@ -127,12 +127,8 @@
     (interactive)
     (let ((default-directory (project-root)))
       (find-file
-       (completing-read
-        "Find file: " (apply #'process-lines find-files-program))))))
-
-(evil-define-key 'motion 'global
-  (kbd "<leader>f") 'find-file-rec
-  (kbd "<leader>b") 'switch-to-buffer)
+       (completing-read "Find file: "
+                        (apply #'process-lines find-files-program))))))
 
 ;;; Customize mode line
 (setq-default
@@ -160,6 +156,42 @@
                  (hpos (- (window-width) (string-width rhs) 1)))
             (propertize " " 'display `(space :align-to ,hpos))))
    mode-line-position))
+
+;;; Compilation
+(straight-use-package 'xterm-color)
+(setq compilation-scroll-output t
+      compilation-ask-about-save nil ; Save before compilation
+      ;; Make compilations unique per frame
+      compilation-buffer-name-function
+      (lambda (name-of-mode)
+        (concat "*" (downcase name-of-mode) "-" (frame-parameter nil 'name) "*"))
+      compilation-environment '("TERM=xterm-256color"))
+;; Interpret ANSI escape sequences in compilation output
+(advice-add #'compilation-filter :filter-args
+            (cl-function (lambda ((proc string))
+                           (list proc (xterm-color-filter string)))))
+(advice-add
+ #'compilation-start :around
+ (lambda (fun &rest args)
+   (let ((compilation-environment (append compilation-environment
+                                          (frame-parameter nil 'environment))))
+     (apply fun args))))
+(defun compile-or-recompile ()
+  "Redo a previous compilation if such exists or prompt for a command.
+Unlike `recompile' it is not necessary to run this in the Compilation
+mode buffer."
+  (interactive)
+  (require 'compile)
+  (if-let ((buf (get-buffer (compilation-buffer-name "compilation"
+                                                     'compilation-mode
+                                                     nil))))
+      (with-current-buffer buf (recompile))
+    (call-interactively #'compile)))
+
+(evil-define-key 'motion 'global
+  (kbd "<leader>b") 'switch-to-buffer
+  (kbd "<leader>f") 'find-file-rec
+  [f9] 'compile-or-recompile)
 
 ;;; Colorscheme
 (straight-use-package 'gruvbox-theme)
