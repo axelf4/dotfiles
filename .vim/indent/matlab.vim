@@ -9,6 +9,7 @@ let b:did_indent = 1
 
 setlocal indentexpr=GetMatlabIndent()
 setlocal indentkeys=!,o,O,e,0=end,0=elseif,0=case,0=otherwise,0=catch,0=function,0=elsei
+let b:undo_indent = "setlocal indentexpr< indentkeys<"
 
 " The value of the Function indenting format in
 " MATLAB Editor/Debugger Language Preferences.
