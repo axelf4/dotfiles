@@ -2,7 +2,7 @@ export VISUAL='emacsclient --alternate-editor= --tty --' # Set Emacs as editor
 HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
 
-function prompt_git() {
+prompt_git() {
 	# Check if we're in a git repo. (fast)
 	git rev-parse --is-inside-work-tree &>/dev/null || return
 	# Check for what branch we're on. (fast)
@@ -15,7 +15,6 @@ function prompt_git() {
 		|| git rev-parse --short HEAD 2> /dev/null \
 		|| echo 'unknown')"
 }
-
 PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
 if [[ $- == *i* ]]; then
@@ -29,3 +28,14 @@ alias ...='cd ../..'
 alias cfg='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
 alias less='less --RAW-CONTROL-CHARS'
 alias ip='ip -color=auto' # Enable ip(8) color output
+
+# Effectively define an alias of length zero:
+# Wrap in shell function since execution will not inherit DEBUG trap
+__prompt_command() {
+	# Check if no other command has been executed since last prompt
+	[[ "$__prev_cmd" = ${FUNCNAME[0]} ]] || return 1
+	ls
+	git status --short --branch 2>/dev/null
+}
+PROMPT_COMMAND='__prompt_command'
+trap '__prev_cmd="$__this_cmd"; __this_cmd="$BASH_COMMAND"' DEBUG
