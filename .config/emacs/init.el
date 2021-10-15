@@ -45,10 +45,12 @@
  evil-undo-system 'undo-tree
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
- evil-split-window-below t evil-vsplit-window-right t)
+ evil-split-window-below t evil-vsplit-window-right t
+ ;; Default fails to mimic Vim by not wrapping before looking in other buffers
+ evil-complete-next-func #'dabbrev-expand)
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
-(add-hook 'evil-local-mode-hook 'undo-tree-mode)
+(add-hook 'evil-local-mode-hook #'undo-tree-mode)
 (evil-define-key 'normal 'global
   "\C-a" 'evil-numbers/inc-at-pt "\C-x" 'evil-numbers/dec-at-pt
   (kbd "g C-a") 'evil-numbers/inc-at-pt-incremental
