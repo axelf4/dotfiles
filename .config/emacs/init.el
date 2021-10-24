@@ -1,4 +1,4 @@
-;;; init.el --- Emacs configuration -*- lexical-binding: t; -*-
+;;; init.el --- Emacs configuration  -*- lexical-binding: t; -*-
 
 ;; Bootstrap the straight.el package manager
 (load (expand-file-name "straight/repos/straight.el/bootstrap.el"
@@ -60,12 +60,15 @@
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
-(define-key minibuffer-local-map [remap completion-at-point] nil) ; but undo remapping...
-;; Make Evil motions/text objects always use the default paragraph definition
+(evil-define-key nil minibuffer-local-map ; but undo remappings...
+  [remap completion-at-point] nil
+  "\C-n" 'next-line "\C-p" 'previous-line)
+;; Always use blank lines as paragraph delimiters in motions/text objects
 (advice-add #'forward-evil-paragraph :around
             (lambda (orig-fun &rest args)
               (let ((paragraph-start (default-value 'paragraph-start))
-                    (paragraph-separate (default-value 'paragraph-separate)))
+                    (paragraph-separate (default-value 'paragraph-separate))
+                    (paragraph-ignore-fill-prefix t))
                 (apply orig-fun args))))
 (define-key evil-normal-state-map [remap goto-last-change]
   (lambda (arg)
@@ -83,7 +86,7 @@
 (with-current-buffer (messages-buffer) (evil-motion-state))
 
 (global-set-key (kbd "<leader>h") 'help-command)
-(evil-define-key 'motion help-mode-map (kbd "C-t") 'help-go-back)
+(evil-define-key 'motion help-mode-map "\C-t" 'help-go-back)
 
 ;; System clipboard support while running in terminal
 (straight-use-package 'xclip)
@@ -221,14 +224,14 @@ mode buffer."
   [escape] 'magit-mode-bury-buffer
   (kbd "RET") 'magit-visit-thing
   (kbd "TAB") 'magit-section-toggle
-  (kbd "]]") 'magit-section-forward (kbd "[[") 'magit-section-backward
+  "]]" 'magit-section-forward "[[" 'magit-section-backward
   "J" 'magit-section-forward-sibling "K" 'magit-section-backward-sibling
   "^" 'magit-section-up
   "f" 'magit-fetch "F" 'magit-pull
   "b" 'magit-branch "B" 'magit-bisect
   "l" 'magit-log "\C-l" 'magit-log-refresh
   "x" 'magit-delete-thing
-  "z" 'magit-stash
+  "gs" 'magit-stash
   "g?" 'magit-dispatch
   "!" 'magit-git-command
   "+" 'magit-diff-more-context "-" 'magit-diff-less-context)
@@ -248,8 +251,15 @@ mode buffer."
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
 (add-hook 'rust-mode-hook
-		  (lambda () (setq indent-tabs-mode nil)))
+          (lambda () (setq indent-tabs-mode nil)))
 
 (straight-use-package 'haskell-mode)
 (straight-use-package 'yaml-mode)
 (straight-use-package 'nix-mode)
+(straight-use-package 'cmake-mode)
+(straight-use-package 'lua-mode)
+(straight-use-package 'julia-mode)
+
+(setq erlang-electric-commands '(erlang-electric-semicolon
+                                 erlang-electric-gt
+                                 erlang-electric-newline))
