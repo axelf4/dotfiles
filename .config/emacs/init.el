@@ -114,21 +114,15 @@
 (defun project-root ()
   "Get the frame-local current working directory."
   (frame-parameter nil 'cwd))
-(defun cd-to-project ()
-  "Make the project root the current buffer's default directory."
-  ;; Magit relies on the original default-directory value
-  (unless (and buffer-file-name
-               (equal (file-name-nondirectory buffer-file-name) "COMMIT_EDITMSG"))
-    (setq default-directory (project-root))))
+(defun with-project-dir (fun &rest args)
+  "Call FUN with ARGS and the project root as the default directory."
+  (let ((default-directory (project-root))) (apply fun args)))
 (add-hook
  'server-after-make-frame-hook
  (lambda ()
    (when-let ((client (frame-parameter nil 'client)))
-     (set-frame-parameter nil 'cwd (process-get client 'server-client-directory))
-     ;; find-file-hook for files visited by client runs before frame creation
-     (dolist (buf (process-get client 'buffers))
-       (with-current-buffer buf (cd-to-project))))))
-(add-hook 'find-file-hook #'cd-to-project)
+     (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
+(advice-add #'evil-ex :around #'with-project-dir)
 
 (let ((find-files-program (cond
                            ((executable-find "rg") '("rg" "--color=never" "--files"))
@@ -136,10 +130,10 @@
   (defun find-file-rec ()
     "Find a file in the current working directory recursively."
     (interactive)
-    (let ((default-directory (project-root)))
-      (find-file
-       (completing-read "Find file: "
-                        (apply #'process-lines find-files-program))))))
+    (find-file
+     (completing-read "Find file: "
+                      (apply #'process-lines find-files-program)))))
+(advice-add #'find-file-rec :around #'with-project-dir)
 
 ;;; Customize mode line
 (setq-default
@@ -198,6 +192,7 @@ mode buffer."
                                                      nil))))
       (with-current-buffer buf (recompile))
     (call-interactively #'compile)))
+(advice-add #'compile-or-recompile :around #'with-project-dir)
 
 ;;; Colorscheme
 (straight-use-package 'gruvbox-theme)
