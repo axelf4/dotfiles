@@ -1,17 +1,17 @@
 call plug#begin('~/.vim/plugged')
-Plug 'romainl/Apprentice'
 Plug 'ctrlpvim/ctrlp.vim'
-" Plug 'Valloric/YouCompleteMe', { 'for': ['c', 'c++', 'java'] }
-Plug 'Raimondi/delimitMate' " Auto closing of brackets, etc.
+Plug 'tmsvg/pear-tree' " Auto closing of brackets, etc.
 Plug 'editorconfig/editorconfig-vim'
 Plug 'axelf4/vim-strip-trailing-whitespace'
 Plug 'mattn/emmet-vim'
 Plug 'junegunn/goyo.vim'
+Plug 'romainl/Apprentice'
 
 Plug 'rust-lang/rust.vim'
 Plug 'axelf4/vim-haskell'
 Plug 'pangloss/vim-javascript'
 Plug 'JuliaEditorSupport/julia-vim'
+Plug 'LnL7/vim-nix'
 call plug#end()
 
 set backspace=indent,eol,start " Allow backspace in insert mode
@@ -44,8 +44,7 @@ if executable('rg')
 	let ctrlp_user_command = 'rg --color=never --files %s'
 endif
 
-let delimitMate_expand_cr = 1
-let delimitMate_balance_matchpairs = 1
+let [pear_tree_smart_openers, pear_tree_smart_closers, pear_tree_smart_backspace] = [1, 1, 1]
 
 let r_indent_align_args = 0 " No R function argument aligning
 let rustfmt_autosave = 1
