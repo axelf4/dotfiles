@@ -32,10 +32,12 @@
 (straight-use-package 'undo-tree)
 (straight-use-package 'goto-chg)
 (straight-use-package 'evil-numbers)
+(straight-use-package 'evil-visualstar)
 (setq
  ;; Behave more like Vim
  evil-want-C-u-delete t
  evil-want-C-u-scroll t
+ evil-start-of-line t
  evil-search-module 'evil-search
  evil-ex-search-highlight-all nil ; No hlsearch
  evil-ex-substitute-case 'sensitive
@@ -51,6 +53,7 @@
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
+(add-hook 'evil-local-mode-hook #'evil-visualstar-mode)
 (evil-define-key 'normal 'global
   "\C-a" 'evil-numbers/inc-at-pt "\C-x" 'evil-numbers/dec-at-pt
   (kbd "g C-a") 'evil-numbers/inc-at-pt-incremental
@@ -192,6 +195,7 @@ mode buffer."
                                                      nil))))
       (with-current-buffer buf (recompile))
     (call-interactively #'compile)))
+(evil-declare-not-repeat #'compile-or-recompile)
 (advice-add #'compile-or-recompile :around #'with-project-dir)
 
 ;;; Colorscheme
