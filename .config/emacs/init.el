@@ -83,6 +83,13 @@
           (when (<= (abs (- old-pos (point))) glc-default-span)
             (setq last-command this-command)
             (goto-last-change arg)))))
+;; Move only vertically with gj/gk despite tracking EOL
+(defun reset-curswant (&rest args)
+  "Unstick the cursor from the end of the line."
+  (when (eq temporary-goal-column most-positive-fixnum)
+    (setq temporary-goal-column 0)))
+(advice-add #'evil-next-visual-line :before #'reset-curswant)
+(advice-add #'evil-previous-visual-line :before #'reset-curswant)
 
 (evil-set-initial-state 'messages-buffer-mode 'motion)
 ;; ...and the preexistent "*Messages*" buffer
