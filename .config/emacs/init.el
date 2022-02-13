@@ -145,6 +145,18 @@
                       (apply #'process-lines find-files-program)))))
 (advice-add #'find-file-rec :around #'with-project-dir)
 
+(with-eval-after-load 'grep
+  (setq grep-save-buffers nil)
+  (when (executable-find "rg")
+    ;; Cannot use `grep-apply-setting' since we only want ripgrep
+    ;; where we know it is available.
+    (grep-compute-defaults) ; Populate defaults
+    (setcdr (assq 'localhost grep-host-defaults-alist)
+            '((grep-command "rg --no-heading -Hn0 ")
+              (grep-use-null-device nil)
+              (grep-highlight-matches t)))))
+(evil-ex-define-cmd "gr[ep]" #'grep)
+
 ;;; Customize mode line
 (setq-default
  mode-line-buffer-identification
