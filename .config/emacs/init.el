@@ -236,7 +236,12 @@ mode buffer."
                 magit-process-mode
                 magit-stashes-mode))
   (evil-set-initial-state mode 'motion))
-(evil-set-initial-state 'git-rebase-mode 'normal)
+(with-eval-after-load 'git-rebase
+  ;; Edit rebase sequences as ordinary text
+  (evil-set-initial-state 'git-rebase-mode 'normal)
+  (add-hook 'git-rebase-mode-hook (lambda () (setq buffer-read-only nil)))
+  (set-keymap-parent (setq git-rebase-mode-map (make-sparse-keymap))
+                     global-map))
 (evil-define-key 'motion magit-mode-map
   "gr" 'magit-refresh "gR" 'magit-refresh-all
   [escape] 'magit-mode-bury-buffer
