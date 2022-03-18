@@ -45,6 +45,8 @@
  glc-default-span 1 ; Consider only immediately adjacent changes as the same
 
  evil-undo-system 'undo-tree
+ undo-tree-auto-save-history nil
+ undo-tree-enable-undo-in-region t
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
@@ -57,7 +59,9 @@
 (evil-define-key 'normal 'global
   "\C-a" 'evil-numbers/inc-at-pt "\C-x" 'evil-numbers/dec-at-pt
   (kbd "g C-a") 'evil-numbers/inc-at-pt-incremental
-  (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental)
+  (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental
+  "U" 'undo-tree-visualize)
+(evil-define-key 'visual 'global "u" 'evil-undo)
 ;; Bindings that make motion state usable as initial state for read-only modes
 (evil-define-key 'motion 'global "ZZ" 'evil-save-modified-and-close "ZQ" 'evil-quit)
 
