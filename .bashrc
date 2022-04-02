@@ -15,7 +15,7 @@ prompt_git() {
 		|| git rev-parse --short HEAD 2> /dev/null \
 		|| echo 'unknown')"
 }
-PS1='\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
+PS1='$(e=$?; [[ $e -ne 0 ]] && echo -n "\[\e[31m\]$e ")\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
 if [[ $- == *i* ]]; then
 	stty -ixon susp undef # Disable XON/XOFF flow control
@@ -37,5 +37,5 @@ __prompt_command() {
 	ls
 	git status --short --branch 2>/dev/null
 }
-PROMPT_COMMAND='__prompt_command'
+PROMPT_COMMAND=__prompt_command
 trap '__prev_cmd="$__this_cmd"; __this_cmd="$BASH_COMMAND"' DEBUG
