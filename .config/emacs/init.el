@@ -50,6 +50,7 @@
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
+ evil-motion-state-modes '()
  ;; Default fails to mimic Vim by not wrapping before looking in other buffers
  evil-complete-next-func #'dabbrev-expand)
 (evil-mode)
@@ -62,8 +63,7 @@
   (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental
   "U" 'undo-tree-visualize)
 (evil-define-key 'visual 'global "u" 'evil-undo)
-;; Bindings that make motion state usable as initial state for read-only modes
-(evil-define-key 'motion 'global "ZZ" 'evil-save-modified-and-close "ZQ" 'evil-quit)
+(evil-define-key 'normal special-mode-map [escape] 'quit-window)
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
@@ -83,10 +83,10 @@
     (interactive "P")
     (setq this-command 'goto-last-change)
     (let ((old-pos (point)))
-          (goto-last-change arg)
-          (when (<= (abs (- old-pos (point))) glc-default-span)
-            (setq last-command this-command)
-            (goto-last-change arg)))))
+      (goto-last-change arg)
+      (when (<= (abs (- old-pos (point))) glc-default-span)
+        (setq last-command this-command)
+        (goto-last-change arg)))))
 ;; Move only vertically with gj/gk despite tracking EOL
 (defun reset-curswant (&rest args)
   "Unstick the cursor from the end of the line."
@@ -95,12 +95,11 @@
 (advice-add #'evil-next-visual-line :before #'reset-curswant)
 (advice-add #'evil-previous-visual-line :before #'reset-curswant)
 
-(evil-set-initial-state 'messages-buffer-mode 'motion)
-;; ...and the preexistent "*Messages*" buffer
-(with-current-buffer (messages-buffer) (evil-motion-state))
+;; Reinitialize the preexistent "*Messages*" buffer
+(with-current-buffer (messages-buffer) (evil-normal-state))
 
 (global-set-key (kbd "<leader>h") 'help-command)
-(evil-define-key 'motion help-mode-map "\C-t" 'help-go-back)
+(evil-define-key 'normal help-mode-map "\C-t" 'help-go-back)
 
 ;; System clipboard support while running in terminal
 (straight-use-package 'xclip)
@@ -235,40 +234,50 @@ mode buffer."
 (dolist (mode '(magit-status-mode
                 magit-log-mode
                 magit-log-select-mode
+                magit-rebase-mode
                 magit-revision-mode
                 magit-diff-mode
                 magit-process-mode
                 magit-stashes-mode))
-  (evil-set-initial-state mode 'motion))
+  (evil-set-initial-state mode 'normal))
 (with-eval-after-load 'git-rebase
   ;; Edit rebase sequences as ordinary text
-  (evil-set-initial-state 'git-rebase-mode 'normal)
   (add-hook 'git-rebase-mode-hook (lambda () (setq buffer-read-only nil)))
   (set-keymap-parent (setq git-rebase-mode-map (make-sparse-keymap))
                      global-map))
-(evil-define-key 'motion magit-mode-map
-  "gr" 'magit-refresh "gR" 'magit-refresh-all
-  [escape] 'magit-mode-bury-buffer
-  (kbd "RET") 'magit-visit-thing
-  (kbd "TAB") 'magit-section-toggle
+(evil-define-key 'normal magit-section-mode-map
+  (kbd "TAB") 'magit-section-toggle "^" 'magit-section-up
   "]]" 'magit-section-forward "[[" 'magit-section-backward
-  "J" 'magit-section-forward-sibling "K" 'magit-section-backward-sibling
-  "^" 'magit-section-up
-  "f" 'magit-fetch "F" 'magit-pull
+  "J" 'magit-section-forward-sibling "K" 'magit-section-backward-sibling)
+(evil-define-key 'normal magit-mode-map
+  [remap quit-window] 'magit-mode-bury-buffer
+  (kbd "RET") 'magit-visit-thing
   "b" 'magit-branch "B" 'magit-bisect
+  "c" 'magit-commit
+  "d" 'magit-diff "D" 'magit-diff-refresh
+  "f" 'magit-fetch "F" 'magit-pull
   "l" 'magit-log "\C-l" 'magit-log-refresh
-  "x" 'magit-delete-thing
+  "P" 'magit-push
+  "r" 'magit-rebase "R" 'magit-file-rename
+  "s" 'magit-stage-file "S" 'magit-stage-modified
+  "u" 'magit-unstage "U" 'magit-unstage-all
+  "x" 'magit-delete-thing "X" 'magit-reset
   "gs" 'magit-stash
+  "gr" 'magit-refresh "gR" 'magit-refresh-all
   "g?" 'magit-dispatch
-  "!" 'magit-git-command
-  "+" 'magit-diff-more-context "-" 'magit-diff-less-context)
+  "+" 'magit-diff-more-context "-" 'magit-diff-less-context
+  "!" 'magit-git-command)
 
-(evil-define-key 'motion 'global
+(evil-define-key 'normal 'global
   (kbd "<leader>b") 'switch-to-buffer
   (kbd "<leader>f") 'find-file-rec
   [f9] 'compile-or-recompile
 
-  (kbd "<leader>g") 'magit-status
+  (kbd "<leader>g")
+  (lambda ()
+    "Run `magit-status' in the root of the current project."
+    (interactive)
+    (magit-status-setup-buffer (project-root)))
   (kbd "<leader>G") 'magit-file-dispatch)
 
 ;;; Language support
