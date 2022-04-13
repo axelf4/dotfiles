@@ -14,7 +14,11 @@
       make-backup-files nil
       auto-save-no-message t
       tags-revert-without-query t
-      vc-handled-backends nil) ; Disable VC
+      vc-handled-backends nil ; Disable VC
+      ;; Tailor dynamic abbrevs for non-text modes by default
+      dabbrev-upcase-means-case-search t
+      dabbrev-case-replace nil
+      dabbrev-case-distinction nil)
 (setq-default tab-width 4)
 (menu-bar-mode 0) ; Disable the menu bar
 (show-paren-mode) ; Highlight matching parentheses
@@ -79,7 +83,7 @@
                 (apply orig-fun args))))
 (define-key evil-normal-state-map [remap goto-last-change]
   (lambda (arg)
-    "Go to penultimate change with cursor already on the last."
+    "Like `goto-last-change' but go to the penultimate change if already there."
     (interactive "P")
     (setq this-command 'goto-last-change)
     (let ((old-pos (point)))
