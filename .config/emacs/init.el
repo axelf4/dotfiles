@@ -164,6 +164,11 @@
               (grep-highlight-matches t)))))
 (evil-ex-define-cmd "gr[ep]" #'grep)
 
+;; Suppress confirmation of find-file-at-point guess
+(advice-add
+ #'ffap-read-file-or-url :override
+ (lambda (_prompt guess) (or guess (user-error "Can't find file"))))
+
 ;;; Customize mode line
 (setq-default
  mode-line-buffer-identification
