@@ -6,13 +6,16 @@
 
 (setq gc-cons-threshold 16777216
       enable-recursive-minibuffers t
+      use-short-answers t
       scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
       truncate-partial-width-windows nil ; Always soft-wrap
       select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
+      xterm-store-paste-on-kill-ring nil
       sentence-end-double-space nil ; Single space between sentences
       show-paren-delay 0
       make-backup-files nil
       auto-save-no-message t
+      kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
       vc-handled-backends nil ; Disable VC
       ;; Tailor dynamic abbrevs for non-text modes by default
@@ -24,12 +27,11 @@
 (show-paren-mode) ; Highlight matching parentheses
 (global-auto-revert-mode)
 (global-set-key [escape] 'keyboard-escape-quit)
-(fset 'yes-or-no-p 'y-or-n-p)
 
 (electric-pair-mode) ; Autopairing
 ;; Inhibit autopairing in minibuffers
 (add-hook 'minibuffer-setup-hook
-          (lambda () (setq-local electric-pair-inhibit-predicate #'identity)))
+          (lambda () (setq-local electric-pair-inhibit-predicate #'always)))
 
 ;;; vi emulation
 (straight-use-package 'evil)
@@ -100,7 +102,7 @@
 (advice-add #'evil-previous-visual-line :before #'reset-curswant)
 
 ;; Reinitialize the preexistent "*Messages*" buffer
-(with-current-buffer (messages-buffer) (evil-normal-state))
+(with-current-buffer (messages-buffer) (evil-normalize-keymaps))
 
 (global-set-key (kbd "<leader>h") 'help-command)
 (evil-define-key 'normal help-mode-map "\C-t" 'help-go-back)
@@ -109,11 +111,6 @@
 (straight-use-package 'xclip)
 (ignore-error file-error ; Silence missing backend error
   (xclip-mode))
-(defun save-kill-ring (fun &rest args)
-  "Call FUN with ARGS and restore the kill ring afterward."
-  (let ((kill-ring kill-ring)) (apply fun args)))
-;; Pasting from system clipboard should not also copy the pasted text
-(advice-add #'current-kill :around #'save-kill-ring)
 
 ;;; Minibuffer completion
 (straight-use-package 'selectrum)
@@ -128,18 +125,18 @@
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
 (push 'cwd frame-inherited-parameters)
-(defun project-root ()
+(defun cwd ()
   "Get the frame-local current working directory."
   (frame-parameter nil 'cwd))
-(defun with-project-dir (fun &rest args)
-  "Call FUN with ARGS and the project root as the default directory."
-  (let ((default-directory (project-root))) (apply fun args)))
+(defun with-cwd (fun &rest args)
+  "Call FUN with ARGS and the current working directory as the default directory."
+  (let ((default-directory (cwd))) (apply fun args)))
 (add-hook
  'server-after-make-frame-hook
  (lambda ()
    (when-let ((client (frame-parameter nil 'client)))
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
-(advice-add #'evil-ex :around #'with-project-dir)
+(advice-add #'evil-ex :around #'with-cwd)
 
 (let ((find-files-program (cond
                            ((executable-find "rg") '("rg" "--color=never" "--files"))
@@ -150,7 +147,7 @@
     (find-file
      (completing-read "Find file: "
                       (apply #'process-lines find-files-program)))))
-(advice-add #'find-file-rec :around #'with-project-dir)
+(advice-add #'find-file-rec :around #'with-cwd)
 
 (with-eval-after-load 'grep
   (setq grep-save-buffers nil)
@@ -175,11 +172,11 @@
  '(:eval
    (if buffer-file-name
        (let* ((dir (abbreviate-file-name
-                    (string-remove-prefix (expand-file-name (project-root))
+                    (string-remove-prefix (expand-file-name (cwd))
                                           (file-name-directory buffer-file-name))))
               (parts (split-string dir "/")))
          (list
-          (if (< (length parts) 5) dir
+          (if (length< parts 5) dir
             (string-join `(,(car parts) "..." . ,(last parts 2)) "/"))
           (propertize (file-name-nondirectory buffer-file-name)
                       'face 'mode-line-buffer-id)))
@@ -227,7 +224,7 @@ mode buffer."
       (with-current-buffer buf (recompile))
     (call-interactively #'compile)))
 (evil-declare-not-repeat #'compile-or-recompile)
-(advice-add #'compile-or-recompile :around #'with-project-dir)
+(advice-add #'compile-or-recompile :around #'with-cwd)
 
 ;;; Colorscheme
 (straight-use-package 'gruvbox-theme)
@@ -286,7 +283,7 @@ mode buffer."
   (lambda ()
     "Run `magit-status' in the root of the current project."
     (interactive)
-    (magit-status-setup-buffer (project-root)))
+    (magit-status-setup-buffer (cwd)))
   (kbd "<leader>G") 'magit-file-dispatch)
 
 ;;; Language support
