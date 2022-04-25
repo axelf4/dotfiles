@@ -69,6 +69,13 @@
   (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental
   "U" 'undo-tree-visualize)
 (evil-define-key 'visual 'global "u" 'evil-undo)
+(evil-define-key 'insert 'global
+  "\C-f" 'indent-according-to-mode
+  ;; Continue comment on new line
+  [remap newline]
+  '(menu-item "" default-indent-new-line :filter
+              (lambda (_cmd) (when (save-excursion (comment-beginning))
+                               comment-line-break-function))))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
 
 ;; Inherit command-line mappings in minibuffers
@@ -237,10 +244,10 @@ mode buffer."
 (with-eval-after-load 'transient
   (define-key transient-base-map [escape] 'transient-quit-one)
   (define-key transient-sticky-map [escape] 'transient-quit-seq))
-(dolist (mode '(magit-status-mode
+(dolist (mode '(git-rebase-mode
+                magit-status-mode
                 magit-log-mode
                 magit-log-select-mode
-                magit-rebase-mode
                 magit-revision-mode
                 magit-diff-mode
                 magit-process-mode
