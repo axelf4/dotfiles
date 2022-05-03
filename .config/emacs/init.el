@@ -12,7 +12,6 @@
       select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
       xterm-store-paste-on-kill-ring nil
       sentence-end-double-space nil ; Single space between sentences
-      show-paren-delay 0
       make-backup-files nil
       auto-save-no-message t
       kill-buffer-delete-auto-save-files t
@@ -23,8 +22,9 @@
       dabbrev-case-replace nil
       dabbrev-case-distinction nil)
 (setq-default tab-width 4)
+(custom-set-variables
+ '(show-paren-delay 0)) ; Highlight matching parentheses immediately
 (menu-bar-mode 0) ; Disable the menu bar
-(show-paren-mode) ; Highlight matching parentheses
 (global-auto-revert-mode)
 (global-set-key [escape] 'keyboard-escape-quit)
 
@@ -53,6 +53,7 @@
  evil-undo-system 'undo-tree
  undo-tree-auto-save-history nil
  undo-tree-enable-undo-in-region t
+ evil-ex-visual-char-range t ; Evil has characterwise ranges
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
@@ -107,6 +108,49 @@
     (setq temporary-goal-column 0)))
 (advice-add #'evil-next-visual-line :before #'reset-curswant)
 (advice-add #'evil-previous-visual-line :before #'reset-curswant)
+
+(defun comment-join-default (beg end)
+  "Join lines in the BEG .. END region with comment leaders removed."
+  (comment-normalize-vars t)
+  (let ((erei (comment-padleft
+               (comment-string-reverse (or comment-continue comment-start))
+               're))
+        (start (progn (goto-char beg) (line-beginning-position 2)))
+        (spt) (next-linec-pt))
+    (save-restriction
+      (narrow-to-region
+       (or (comment-beginning) beg)
+       (progn (goto-char end)
+              (backward-char)
+              (line-end-position (when (<= end start) 2))))
+      (goto-char (point-max))
+      (insert ?\n)
+
+      (goto-char (point-min))
+      (while (and (not (eobp))
+                  (setq spt (comment-search-forward (point-max) t)))
+        (let ((npt (line-beginning-position 2)) (iept (point-max)) (ept))
+          (if (when (progn (goto-char spt) (comment-forward))
+                (setq ept (point)
+                      iept (save-excursion (comment-enter-backward) (point)))
+                (= ept npt)) ; Line comments generally include NL
+              (progn ; Join line comments
+                (and next-linec-pt (= spt next-linec-pt)
+                     (uncomment-region spt ept))
+                (setq next-linec-pt (progn (skip-chars-forward " \t") (point))))
+            (save-excursion ; Eliminate continuation markers
+              (goto-char spt)
+              (dotimes (_ (1- (count-lines spt iept)))
+                (forward-line)
+                (when (and (<= start (point)) (looking-at erei))
+                  (replace-match "" t t nil 0)))))))
+
+      (goto-char (point-max))
+      (delete-char -1)
+      (forward-line -1)
+      (join-line nil beg (point))
+      (join-line t))))
+(advice-add #'evil-join :override #'comment-join-default)
 
 ;; Reinitialize the preexistent "*Messages*" buffer
 (with-current-buffer (messages-buffer) (evil-normalize-keymaps))
