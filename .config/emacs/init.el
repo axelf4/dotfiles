@@ -16,7 +16,9 @@
       auto-save-no-message t
       kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
+      xref-auto-jump-to-first-xref t
       vc-handled-backends nil ; Disable VC
+      calendar-week-start-day 1 ; Monday as first day of the week
       ;; Tailor dynamic abbrevs for non-text modes by default
       dabbrev-upcase-means-case-search t
       dabbrev-case-replace nil
@@ -26,6 +28,8 @@
  '(show-paren-delay 0)) ; Highlight matching parentheses immediately
 (menu-bar-mode 0) ; Disable the menu bar
 (global-auto-revert-mode)
+(delete-selection-mode)
+(add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 (global-set-key [escape] 'keyboard-escape-quit)
 
 (electric-pair-mode) ; Autopairing
@@ -156,7 +160,11 @@
 (with-current-buffer (messages-buffer) (evil-normalize-keymaps))
 
 (global-set-key (kbd "<leader>h") 'help-command)
-(evil-define-key 'normal help-mode-map "\C-t" 'help-go-back)
+(evil-define-key 'normal help-mode-map
+  "\C-t" 'help-go-back
+  "s" 'help-view-source)
+
+(evil-define-key 'normal xref--xref-buffer-mode-map (kbd "RET") 'xref-goto-xref)
 
 ;; System clipboard support while running in terminal
 (straight-use-package 'xclip)
@@ -325,10 +333,75 @@ mode buffer."
   "+" 'magit-diff-more-context "-" 'magit-diff-less-context
   "!" 'magit-git-command)
 
+;;; Snippets
+(straight-use-package 'yasnippet)
+(yas-global-mode)
+(add-hook
+ 'yas-keymap-disable-hook
+ (lambda ()
+   (when-let* (((not (evil-normal-state-p)))
+               (snippet (car-safe (yas-active-snippets)))
+               (active-field (yas--snippet-active-field snippet)))
+     (/= (yas--field-start active-field) (point)))))
+
+;;; Insert mode completion
+(straight-use-package 'company-mode)
+(with-eval-after-load 'company
+  (setq company-idle-delay nil
+        company-require-match nil
+        company-selection-wrap-around t
+        company-tooltip-align-annotations t
+        company-tooltip-flip-when-above t
+        company-frontends '(company-pseudo-tooltip-frontend company-echo-metadata-frontend)
+        company-backends '((company-yasnippet company-capf)))
+  (add-hook 'evil-normal-state-entry-hook #'company-abort)
+  (evil-define-key nil company-active-map
+    [escape] 'company-abort
+    "\C-w" nil ; Do not shadow `evil-delete-backward-word'
+    (kbd "TAB") 'company-complete-common-or-cycle
+    [backtab] 'company-select-previous))
+(define-key global-map [remap indent-for-tab-command]
+    (lambda (arg)
+      "Perform symbol completion and/or indent the line if in the left margin.
+Differs from having `tab-always-indent' set to `complete' in that it
+always tries to complete if point is right of the left margin. This
+facilitates completion even in programming language modes that do TAB
+cycle indentation where you otherwise would only be cycling forever."
+      (interactive "P")
+      (setq this-command 'indent-for-tab-command)
+      (unless (bound-and-true-p company-mode) (company-mode))
+      (if (> (current-column) (current-indentation))
+          (company-complete-common)
+        (company-indent-or-complete-common arg))))
+
+;;; Language server protocol
+(straight-use-package 'lsp-mode)
+(with-eval-after-load 'lsp-mode
+  (setq lsp-keymap-prefix "<leader> l"
+        lsp-enable-symbol-highlighting nil
+        lsp-enable-text-document-color nil
+        lsp-enable-folding nil
+        lsp-auto-execute-action nil
+        lsp-enable-suggest-server-download nil
+        lsp-rust-analyzer-server-display-inlay-hints t)
+  (add-hook
+   'prog-mode-hook
+   (lambda ()
+     "Start lsp mode if the current buffer is part of a session."
+     (and buffer-file-name
+          (lsp-find-session-folder (lsp-session) buffer-file-name)
+          (lsp--filter-clients (-andfn #'lsp--supports-buffer?
+                                       #'lsp--server-binary-present?))
+          (lsp)))))
+
 (evil-define-key 'normal 'global
+  (kbd "<leader>u") 'universal-argument
   (kbd "<leader>b") 'switch-to-buffer
   (kbd "<leader>f") 'find-file-rec
+  (kbd "<leader>F") 'dired-jump
   [f9] 'compile-or-recompile
+  (kbd "<leader>e") 'pp-eval-last-sexp
+  (kbd "<leader>E") 'eval-defun
 
   (kbd "<leader>g")
   (lambda ()
@@ -345,6 +418,17 @@ mode buffer."
 (setq rust-format-on-save t)
 (add-hook 'rust-mode-hook
           (lambda () (setq indent-tabs-mode nil)))
+
+(straight-use-package 'typescript-mode)
+(defun add-node-modules-to-path ()
+  "Add node_modules/.bin to buffer-local `exec-path', if applicable."
+  (when-let ((root (locate-dominating-file ; "npm bin" is too slow
+                    (or buffer-file-name default-directory)
+                    "node_modules")))
+    (make-local-variable 'exec-path)
+    (cl-pushnew (expand-file-name "node_modules/.bin" root) exec-path
+                :test #'string=)))
+(add-hook 'typescript-mode-hook #'add-node-modules-to-path)
 
 (straight-use-package 'haskell-mode)
 (straight-use-package 'yaml-mode)
