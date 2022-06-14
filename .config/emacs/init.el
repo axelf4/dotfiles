@@ -113,21 +113,17 @@
 (advice-add #'evil-next-visual-line :before #'reset-curswant)
 (advice-add #'evil-previous-visual-line :before #'reset-curswant)
 
-(defun comment-join-default (beg end)
+(defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
   (comment-normalize-vars t)
-  (let ((erei (comment-padleft
-               (comment-string-reverse (or comment-continue comment-start))
-               're))
-        (start (progn (goto-char beg) (line-beginning-position 2)))
-        (spt) (next-linec-pt))
+  (let ((prefix (and (length> fill-prefix 0) (regexp-quote fill-prefix)))
+        (erei (comment-padleft
+               (comment-string-reverse (or comment-continue comment-start)) 're))
+        (spt (progn (goto-char beg) (line-beginning-position 2))) (next-linec-pt))
     (save-restriction
       (narrow-to-region
        (or (comment-beginning) beg)
-       (progn (goto-char end)
-              (backward-char)
-              (line-end-position (when (<= end start) 2))))
-      (goto-char (point-max))
+       (progn (goto-char (1- end)) (end-of-line (when (<= end spt) 2)) (point)))
       (insert ?\n)
 
       (goto-char (point-min))
@@ -146,15 +142,21 @@
               (goto-char spt)
               (dotimes (_ (1- (count-lines spt iept)))
                 (forward-line)
-                (when (and (<= start (point)) (looking-at erei))
-                  (replace-match "" t t nil 0)))))))
+                (when (and (< beg (point)) (looking-at erei))
+                  (replace-match "" t t)))))))
 
-      (goto-char (point-max))
+      (goto-char beg)
+      (setq spt nil)
+      (while (progn (forward-line) (not (eobp)))
+        (and prefix (looking-at prefix) (replace-match "" t t))
+        (delete-region (1- (point)) (progn (skip-chars-forward " \t") (point)))
+        (setq spt (point))
+        (or (memq (following-char) '(0 ?\n ?\)))
+            (memq (preceding-char) '(0 ?\n ?\t ?\s))
+            (insert ?\s)))
       (delete-char -1)
-      (forward-line -1)
-      (join-line nil beg (point))
-      (join-line t))))
-(advice-add #'evil-join :override #'comment-join-default)
+      (if spt (goto-char spt) (signal 'end-of-buffer nil)))))
+(advice-add #'evil-join :override #'comment-join-line)
 
 ;; Reinitialize the preexistent "*Messages*" buffer
 (with-current-buffer (messages-buffer) (evil-normalize-keymaps))
