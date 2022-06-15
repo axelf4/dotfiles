@@ -378,14 +378,14 @@ cycle indentation where you otherwise would only be cycling forever."
 
 ;;; Language server protocol
 (straight-use-package 'lsp-mode)
+(setq lsp-keymap-prefix "<leader> l"
+      lsp-enable-symbol-highlighting nil
+      lsp-enable-text-document-color nil
+      lsp-enable-folding nil
+      lsp-auto-execute-action nil
+      lsp-enable-suggest-server-download nil
+      lsp-rust-analyzer-server-display-inlay-hints t)
 (with-eval-after-load 'lsp-mode
-  (setq lsp-keymap-prefix "<leader> l"
-        lsp-enable-symbol-highlighting nil
-        lsp-enable-text-document-color nil
-        lsp-enable-folding nil
-        lsp-auto-execute-action nil
-        lsp-enable-suggest-server-download nil
-        lsp-rust-analyzer-server-display-inlay-hints t)
   (add-hook
    'prog-mode-hook
    (lambda ()
