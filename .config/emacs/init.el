@@ -180,6 +180,7 @@
 (setq completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
+      completion-styles '(hotfuzz)
       selectrum-extend-current-candidate-highlight t)
 (selectrum-mode)
 (hotfuzz-selectrum-mode)
@@ -224,9 +225,8 @@
 (evil-ex-define-cmd "gr[ep]" #'grep)
 
 ;; Suppress confirmation of find-file-at-point guess
-(advice-add
- #'ffap-read-file-or-url :override
- (lambda (_prompt guess) (or guess (user-error "Can't find file"))))
+(advice-add #'ffap-read-file-or-url :override
+            (lambda (_prompt guess) (or guess (user-error "Can't find file"))))
 
 ;;; Customize mode line
 (setq-default
@@ -356,7 +356,7 @@ mode buffer."
         company-tooltip-align-annotations t
         company-tooltip-flip-when-above t
         company-frontends '(company-pseudo-tooltip-frontend company-echo-metadata-frontend)
-        company-backends '((company-yasnippet company-capf)))
+        company-backends '((company-yasnippet company-capf :separate)))
   (add-hook 'evil-normal-state-entry-hook #'company-abort)
   (evil-define-key nil company-active-map
     [escape] 'company-abort
@@ -364,18 +364,18 @@ mode buffer."
     (kbd "TAB") 'company-complete-common-or-cycle
     [backtab] 'company-select-previous))
 (define-key global-map [remap indent-for-tab-command]
-    (lambda (arg)
-      "Perform symbol completion and/or indent the line if in the left margin.
+  (lambda (arg)
+    "Perform symbol completion and/or indent the line if in the left margin.
 Differs from having `tab-always-indent' set to `complete' in that it
 always tries to complete if point is right of the left margin. This
 facilitates completion even in programming language modes that do TAB
 cycle indentation where you otherwise would only be cycling forever."
-      (interactive "P")
-      (setq this-command 'indent-for-tab-command)
-      (unless (bound-and-true-p company-mode) (company-mode))
-      (if (> (current-column) (current-indentation))
-          (company-complete-common)
-        (company-indent-or-complete-common arg))))
+    (interactive "P")
+    (setq this-command 'indent-for-tab-command)
+    (unless (bound-and-true-p company-mode) (company-mode))
+    (if (> (current-column) (current-indentation))
+        (company-complete-common)
+      (company-indent-or-complete-common arg))))
 
 ;;; Language server protocol
 (straight-use-package 'lsp-mode)
