@@ -79,8 +79,9 @@
   ;; Continue comment on new line
   [remap newline]
   '(menu-item "" default-indent-new-line :filter
-              (lambda (_cmd) (when (save-excursion (comment-beginning))
-                               comment-line-break-function))))
+              (lambda (_cmd)
+                (when (save-excursion (comment-beginning))
+                  `(lambda () (interactive) (,comment-line-break-function))))))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
 
 ;; Inherit command-line mappings in minibuffers
