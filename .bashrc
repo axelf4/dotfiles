@@ -1,6 +1,7 @@
 export VISUAL='emacsclient --alternate-editor= --tty --' # Set Emacs as editor
 HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt (requires Bash 4.x)
+export ERL_AFLAGS='+pc unicode -kernel shell_history enabled'
 
 prompt_git() {
 	# Check if we're in a git repo. (fast)
