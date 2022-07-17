@@ -57,6 +57,7 @@
  evil-undo-system 'undo-tree
  undo-tree-auto-save-history nil
  undo-tree-enable-undo-in-region t
+ evil-ex-complete-emacs-commands t
  evil-ex-visual-char-range t ; Evil has characterwise ranges
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
@@ -69,11 +70,12 @@
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
 (add-hook 'evil-local-mode-hook #'evil-visualstar-mode)
 (evil-define-key 'normal 'global
+  "\C-^" 'evil-switch-to-windows-last-buffer
   "\C-a" 'evil-numbers/inc-at-pt "\C-x" 'evil-numbers/dec-at-pt
   (kbd "g C-a") 'evil-numbers/inc-at-pt-incremental
   (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental
   "U" 'undo-tree-visualize)
-(evil-define-key 'visual 'global "u" 'evil-undo)
+(evil-define-key 'visual 'global "u" nil)
 (evil-define-key 'insert 'global
   "\C-f" 'indent-according-to-mode
   ;; Continue comment on new line
@@ -83,6 +85,15 @@
                 (when (save-excursion (comment-beginning))
                   `(lambda () (interactive) (,comment-line-break-function))))))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
+
+;; Inherit split window's previous buffers
+(advice-add
+ #'split-window :around
+ (lambda (fun window &rest args)
+   (let* ((prev-buffers (copy-sequence (window-prev-buffers window)))
+          (new (apply fun window args)))
+     (set-window-prev-buffers new prev-buffers)
+     new)))
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
@@ -126,7 +137,6 @@
        (or (comment-beginning) beg)
        (progn (goto-char (1- end)) (end-of-line (when (<= end spt) 2)) (point)))
       (insert ?\n)
-
       (goto-char (point-min))
       (while (and (not (eobp))
                   (setq spt (comment-search-forward (point-max) t)))
@@ -145,7 +155,6 @@
                 (forward-line)
                 (when (and (< beg (point)) (looking-at erei))
                   (replace-match "" t t)))))))
-
       (goto-char beg)
       (setq spt nil)
       (while (progn (forward-line) (not (eobp)))
@@ -306,6 +315,7 @@ mode buffer."
                 magit-revision-mode
                 magit-diff-mode
                 magit-process-mode
+                magit-stash-mode
                 magit-stashes-mode))
   (evil-set-initial-state mode 'normal))
 (with-eval-after-load 'git-rebase
@@ -385,6 +395,7 @@ cycle indentation where you otherwise would only be cycling forever."
       lsp-enable-folding nil
       lsp-auto-execute-action nil
       lsp-enable-suggest-server-download nil
+      lsp-completion-default-behaviour :insert
       lsp-rust-analyzer-server-display-inlay-hints t)
 (with-eval-after-load 'lsp-mode
   (add-hook
