@@ -1,8 +1,8 @@
 ;;; init.el --- Emacs configuration  -*- lexical-binding: t; -*-
 
 ;; Bootstrap the straight.el package manager
-(load (expand-file-name "straight/repos/straight.el/bootstrap.el"
-                        user-emacs-directory) nil 'nomessage)
+(load (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory)
+      nil 'nomessage)
 
 (setq gc-cons-threshold 16777216
       enable-recursive-minibuffers t
@@ -427,6 +427,38 @@ cycle indentation where you otherwise would only be cycling forever."
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
                                                  indent-tabs-mode nil)))
+
+;; CC Mode
+(defun c-lineup-conditional-test-clause (_langelem)
+  "Indent by `c-basic-offset' times 2 instead of aligning with offset anchor.
+Tweaks for loop expressions which otherwise have alignment hardcoded
+\(case 7D in `c-guess-basic-syntax'), e.g.:
+
+for (int i;
+        i < 3; ++i)
+<--><--> c-basic-offset
+
+Works with: statement, statement-cont."
+  (let (indent)
+    (when (save-excursion (> (c-langelem-col c-syntactic-element)
+                             (setq indent (current-indentation))))
+      (vector (+ indent (* 2 c-basic-offset))))))
+(c-add-style
+ "my-style" ; C/C++ style that uses alignment less liberally
+ '((c-comment-only-line-offset 0 . 0) ; Indent column-zero comment lines too
+   (c-offsets-alist
+    (substatement-open . 0)
+    (block-close . c-lineup-under-anchor)
+    (statement c-lineup-conditional-test-clause 0)
+    (statement-cont add c-lineup-conditional-test-clause +)
+    (arglist-cont-nonempty . +)
+    (arglist-close
+     . (lambda (langelem) (if (eq (c-lineup-close-paren langelem) 0) 0 '+)))
+    (label . 0) (substatement-label . 0))))
+(setq c-cleanup-list '(comment-close-slash)
+      c-electric-pound-behavior '(alignleft)
+      c-indent-comments-syntactically-p t
+      c-default-style '((java-mode . "java") (awk-mode . "awk") (other . "my-style")))
 
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
