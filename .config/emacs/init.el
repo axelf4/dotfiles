@@ -184,15 +184,17 @@
   (xclip-mode))
 
 ;;; Minibuffer completion
-(straight-use-package 'selectrum)
+(straight-use-package 'vertico)
+(straight-use-package 'consult)
 (straight-use-package 'hotfuzz)
 (setq completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
       completion-styles '(hotfuzz)
-      selectrum-extend-current-candidate-highlight t)
-(selectrum-mode)
-(hotfuzz-selectrum-mode)
+      completion-category-defaults nil
+      completion-in-region-function #'consult-completion-in-region)
+(vertico-mode)
+(hotfuzz-vertico-mode)
 
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
