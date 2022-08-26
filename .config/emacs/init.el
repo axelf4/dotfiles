@@ -168,6 +168,11 @@
       (if spt (goto-char spt) (signal 'end-of-buffer nil)))))
 (advice-add #'evil-join :override #'comment-join-line)
 
+(evil-define-operator evil-comment (beg end)
+  "Toggle comment from BEG to END."
+  (interactive "<r>")
+  (comment-or-uncomment-region beg end))
+
 ;; Reinitialize the preexistent "*Messages*" buffer
 (with-current-buffer (messages-buffer) (evil-normalize-keymaps))
 
@@ -411,6 +416,7 @@ cycle indentation where you otherwise would only be cycling forever."
           (lsp)))))
 
 (evil-define-key 'normal 'global
+  "gc" 'evil-comment
   (kbd "<leader>u") 'universal-argument
   (kbd "<leader>b") 'switch-to-buffer
   (kbd "<leader>f") 'find-file-rec
