@@ -18,6 +18,8 @@ prompt_git() {
 }
 PS1='$(e=$?; [[ $e -ne 0 ]] && echo -n "\[\e[31m\]$e ")\[\e[36m\]\w\[\e[1;33m\]$(prompt_git)\[\e[0m\] ❯ '
 
+mkcd() { mkdir -p "$@" && cd -- "${@: -1}"; }
+
 # Prints an overview of the current directory.
 status() {
 	ls
@@ -30,7 +32,7 @@ if [[ $- == *i* ]]; then
 
 	bind '"\C-m": "\xff1\xff0"'
 	bind '"\xff0": accept-line'
-	bind -x '"\xff1": [[ -z "$READLINE_LINE" ]] && READLINE_LINE=\ status'
+	bind -x '"\xff1": [[ -z "$READLINE_LINE" ]] 2>/dev/null && READLINE_LINE=\ status'
 fi
 
 alias e=\$VISUAL
