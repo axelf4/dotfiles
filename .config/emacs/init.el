@@ -16,7 +16,10 @@
       auto-save-no-message t
       kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
+      tags-add-tables t
+      next-error-recenter t
       xref-auto-jump-to-first-xref t
+      help-window-select t
       vc-handled-backends nil ; Disable VC
       calendar-week-start-day 1 ; Monday as first day of the week
       ;; Tailor dynamic abbrevs for non-text modes by default
@@ -40,7 +43,6 @@
 ;;; vi emulation
 (straight-use-package 'evil)
 (straight-use-package 'undo-tree)
-(straight-use-package 'goto-chg)
 (straight-use-package 'evil-numbers)
 (straight-use-package 'evil-visualstar)
 (setq
@@ -86,15 +88,6 @@
                   `(lambda () (interactive) (,comment-line-break-function))))))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
 
-;; Inherit split window's previous buffers
-(advice-add
- #'split-window :around
- (lambda (fun window &rest args)
-   (let* ((prev-buffers (copy-sequence (window-prev-buffers window)))
-          (new (apply fun window args)))
-     (set-window-prev-buffers new prev-buffers)
-     new)))
-
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
 (evil-define-key nil minibuffer-local-map ; but undo remappings...
@@ -107,23 +100,28 @@
                     (paragraph-separate (default-value 'paragraph-separate))
                     (paragraph-ignore-fill-prefix t))
                 (apply orig-fun args))))
-(define-key evil-normal-state-map [remap goto-last-change]
-  (lambda (arg)
+(define-key evil-normal-state-map [remap evil-goto-last-change]
+  (evil-define-motion nil (count)
     "Like `goto-last-change' but go to the penultimate change if already there."
-    (interactive "P")
-    (setq this-command 'goto-last-change)
     (let ((old-pos (point)))
-      (goto-last-change arg)
-      (when (<= (abs (- old-pos (point))) glc-default-span)
+      (evil-goto-last-change count)
+      (when (and (null count) (<= (abs (- old-pos (point))) glc-default-span))
         (setq last-command this-command)
-        (goto-last-change arg)))))
+        (goto-last-change nil)))))
 ;; Move only vertically with gj/gk despite tracking EOL
-(defun reset-curswant (&rest args)
+(defun reset-curswant (&rest _)
   "Unstick the cursor from the end of the line."
   (when (eq temporary-goal-column most-positive-fixnum)
     (setq temporary-goal-column 0)))
 (advice-add #'evil-next-visual-line :before #'reset-curswant)
 (advice-add #'evil-previous-visual-line :before #'reset-curswant)
+;; Inherit split window's previous buffers
+(let ((f (lambda (fun &rest args)
+           (let ((prev-buffers (copy-sequence (window-prev-buffers))))
+             (apply fun args)
+             (set-window-prev-buffers nil prev-buffers)))))
+  (advice-add #'evil-window-split :around f)
+  (advice-add #'evil-window-vsplit :around f))
 
 (defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
@@ -472,6 +470,8 @@ Works with: statement, statement-cont."
 (setq rust-format-on-save t)
 (add-hook 'rust-mode-hook
           (lambda () (setq indent-tabs-mode nil)))
+
+(setq markdown-indent-on-enter 'indent-and-new-item)
 
 (straight-use-package 'typescript-mode)
 (defun add-node-modules-to-path ()
