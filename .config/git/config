@@ -8,5 +8,8 @@
 [merge]
 	conflictStyle = zdiff3
 
+[diff "lisp"]
+	xfuncname = "^\\([^[:space:]]*def[^[:space:]]+[[:space:]]+[^()[:space:]]+.*$"
+
 [url "git@github.com:"]
 	insteadOf = "gh:"
