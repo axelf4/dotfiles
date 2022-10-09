@@ -5,15 +5,16 @@
       nil 'nomessage)
 
 (setq gc-cons-threshold 16777216
+      native-comp-async-report-warnings-errors 'silent
       enable-recursive-minibuffers t
       use-short-answers t
       scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
       truncate-partial-width-windows nil ; Always soft-wrap
       select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
       xterm-store-paste-on-kill-ring nil
-      sentence-end-double-space nil ; Single space between sentences
       make-backup-files nil
       auto-save-no-message t
+      auto-save-include-big-deletions t
       kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
       tags-add-tables t
@@ -21,6 +22,7 @@
       xref-auto-jump-to-first-xref t
       help-window-select t
       vc-handled-backends nil ; Disable VC
+      sentence-end-double-space nil ; Single space between sentences
       calendar-week-start-day 1 ; Monday as first day of the week
       ;; Tailor dynamic abbrevs for non-text modes by default
       dabbrev-upcase-means-case-search t
@@ -351,6 +353,38 @@ mode buffer."
   "+" 'magit-diff-more-context "-" 'magit-diff-less-context
   "!" 'magit-git-command)
 
+(with-eval-after-load 'smerge-mode
+  (require 'transient)
+  (transient-define-prefix smerge-dispatch ()
+    "Invoke an SMerge command from a list of available commands."
+    [["Keep"
+      ("b" "Base" smerge-keep-base)
+      ("u" "Upper" smerge-keep-upper)
+      ("l" "Lower" smerge-keep-lower)
+      ("a" "All" smerge-keep-all) ("RET" "Current" smerge-keep-current)]
+     ["Diff"
+      ("<" "Base/upper" smerge-diff-base-upper)
+      ("=" "Upper/lower" smerge-diff-upper-lower)
+      (">" "Base/lower" smerge-diff-base-lower)
+      ("R" "Refine" smerge-refine :transient t)]
+     ["Other"
+      ("C" "Combine" smerge-combine-with-next)
+      ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
+  (define-key (plist-get smerge-text-properties 'keymap)
+    (kbd "RET") '(menu-item "" smerge-dispatch :enable (evil-normal-state-p))))
+(evil-define-motion evil-forward-conflict (count)
+  "Move the cursor to the beginning of the COUNT-th next conflict."
+  :jump t :type exclusive
+  (require 'smerge-mode)
+  (smerge-next count)
+  (unless smerge-mode (smerge-mode)))
+(evil-define-motion evil-backward-conflict (count)
+  "Move the cursor to the beginning of the COUNT-th previous conflict."
+  :jump t :type inclusive
+  (require 'smerge-mode)
+  (smerge-prev count)
+  (unless smerge-mode (smerge-mode)))
+
 ;;; Snippets
 (straight-use-package 'yasnippet)
 (yas-global-mode)
@@ -429,6 +463,8 @@ cycle indentation where you otherwise would only be cycling forever."
     (interactive)
     (magit-status-setup-buffer (cwd)))
   (kbd "<leader>G") 'magit-file-dispatch)
+(evil-define-key 'motion 'global
+  "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
