@@ -20,7 +20,6 @@
       tags-add-tables t
       next-error-recenter t
       xref-auto-jump-to-first-xref t
-      help-window-select t
       vc-handled-backends nil ; Disable VC
       sentence-end-double-space nil ; Single space between sentences
       calendar-week-start-day 1 ; Monday as first day of the week
@@ -176,11 +175,6 @@
 ;; Reinitialize the preexistent "*Messages*" buffer
 (with-current-buffer (messages-buffer) (evil-normalize-keymaps))
 
-(global-set-key (kbd "<leader>h") 'help-command)
-(evil-define-key 'normal help-mode-map
-  "\C-t" 'help-go-back
-  "s" 'help-view-source)
-
 (evil-define-key 'normal xref--xref-buffer-mode-map (kbd "RET") 'xref-goto-xref)
 
 ;; System clipboard support while running in terminal
@@ -270,6 +264,17 @@
                  (hpos (- (window-width) (string-width rhs) 1)))
             (propertize " " 'display `(space :align-to ,hpos))))
    mode-line-position))
+
+;;; Reading documentation
+(setq help-window-select t)
+(evil-define-key 'normal help-mode-map
+  "\C-t" 'help-go-back
+  "s" 'help-view-source)
+
+(straight-use-package 'devdocs)
+(setq devdocs-window-select t)
+(add-hook 'devdocs-mode-hook (lambda () (kill-local-variable 'truncate-lines)))
+(define-key help-map "D" 'devdocs-lookup)
 
 ;;; Compilation
 (straight-use-package 'xterm-color)
@@ -450,6 +455,7 @@ cycle indentation where you otherwise would only be cycling forever."
 (evil-define-key 'normal 'global
   "gc" 'evil-comment
   (kbd "<leader>u") 'universal-argument
+  (kbd "<leader>h") 'help-command
   (kbd "<leader>b") 'switch-to-buffer
   (kbd "<leader>f") 'find-file-rec
   (kbd "<leader>F") 'dired-jump
