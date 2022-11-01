@@ -1,0 +1,12 @@
+defaults
+auth
+tls
+
+account axelf.nu
+host smtp.sendgrid.net
+tls_starttls off
+from axel@axelf.nu
+user apikey
+passwordeval "kwallet-query --read-password msmtp/sendgrid kdewallet"
+
+account default : axelf.nu

@@ -1,0 +1,11 @@
+[database]
+path=.mail
+
+[new]
+tags=new
+
+[search]
+exclude_tags=deleted;spam
+
+[index]
+header.List=List-Id # Index the List-Id header as List: prefix

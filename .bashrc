@@ -2,6 +2,7 @@ export VISUAL='emacsclient --alternate-editor= --tty --' # Set Emacs as editor
 HISTIGNORE='&:??: *:pwd:clear:exit'
 PROMPT_DIRTRIM=2 # Trim long paths in the prompt
 export ERL_AFLAGS='+pc unicode -kernel shell_history enabled'
+export EMAIL=axel@axelf.nu
 
 prompt_git() {
 	# Check if inside a Git repository

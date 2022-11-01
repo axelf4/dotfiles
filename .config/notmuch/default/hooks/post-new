@@ -1,0 +1,13 @@
+#!/bin/sh
+
+notmuch tag --batch <<-EOF
+	# Sync mail deleted/archived from far side
+	-inbox tag:new tag:inbox not folder:gmail/INBOX
+	+inbox tag:new folder:gmail/INBOX
+
+	+emacs-devel -inbox tag:new List:emacs-devel.gnu.org
+	+bug-gnu-emacs -inbox tag:new List:bug-gnu-emacs.gnu.org
+	+vim -inbox tag:new List:vim_dev.googlegroups.com
+
+	-new tag:new
+EOF
