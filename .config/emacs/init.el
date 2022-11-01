@@ -10,6 +10,7 @@
       use-short-answers t
       scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
       truncate-partial-width-windows nil ; Always soft-wrap
+      window-combination-resize t
       select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
       xterm-store-paste-on-kill-ring nil
       make-backup-files nil
@@ -222,6 +223,29 @@
                       (apply #'process-lines find-files-program)))))
 (advice-add #'find-file-rec :around #'with-cwd)
 
+;; File browsing
+(setq dired-auto-revert-buffer #'dired-directory-changed-p
+      dired-dwim-target t
+      dired-listing-switches "-Ahl --group-directories-first")
+(add-hook 'dired-mode-hook #'dired-hide-details-mode)
+(evil-set-initial-state 'wdired-mode 'normal)
+(evil-define-key nil dired-mode-map (kbd "SPC") nil)
+(evil-define-key 'normal dired-mode-map
+  "j" 'dired-next-line "k" 'dired-previous-line
+  "e" 'find-file "I" 'dired-toggle-read-only)
+(evil-define-key 'normal wdired-mode-map
+  "ZQ" 'wdired-abort-changes "ZZ" 'wdired-finish-edit)
+
+(defun sudo-file-name (file)
+  "Return TRAMP file name for editing FILE as root with sudo."
+  (let ((remote-id (copy-sequence (file-remote-p file))))
+    (concat
+     (if remote-id
+         (progn (aset remote-id (1- (length remote-id)) ?|) ; Replace :
+                remote-id)
+       "/")
+     "sudo::" (or (file-remote-p file 'localname) file))))
+
 (with-eval-after-load 'grep
   (setq grep-save-buffers nil)
   (when (executable-find "rg")
@@ -247,11 +271,10 @@
                     (string-remove-prefix (expand-file-name (cwd))
                                           (file-name-directory buffer-file-name))))
               (parts (split-string dir "/")))
-         (list
-          (if (length< parts 5) dir
-            (string-join `(,(car parts) "..." . ,(last parts 2)) "/"))
-          (propertize (file-name-nondirectory buffer-file-name)
-                      'face 'mode-line-buffer-id)))
+         (list (if (length< parts 5) dir
+                 (string-join `(,(car parts) "..." . ,(last parts 2)) "/"))
+               (propertize (file-name-nondirectory buffer-file-name)
+                           'face 'mode-line-buffer-id)))
      (propertize (buffer-name) 'face 'mode-line-buffer-id)))
  mode-line-modified '(:eval (when (buffer-modified-p) " [+]"))
  mode-line-percent-position '(-3 "%o")
