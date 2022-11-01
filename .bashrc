@@ -29,6 +29,7 @@ status() {
 if [[ $- == *i* ]]; then
 	stty -ixon susp undef # Disable XON/XOFF flow control
 	bind -x '"\C-z": fg' # Make ^Z toggle between fore-/background
+	bind '\C-n: dabbrev-expand'
 
 	bind '"\C-m": "\xff1\xff0"'
 	bind '"\xff0": accept-line'
