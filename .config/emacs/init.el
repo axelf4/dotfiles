@@ -22,6 +22,7 @@
       next-error-recenter t
       xref-auto-jump-to-first-xref t
       vc-handled-backends nil ; Disable VC
+      comment-multi-line t
       sentence-end-double-space nil ; Single space between sentences
       calendar-week-start-day 1 ; Monday as first day of the week
       ;; Tailor dynamic abbrevs for non-text modes by default
@@ -42,6 +43,15 @@
 (add-hook 'minibuffer-setup-hook
           (lambda () (setq-local electric-pair-inhibit-predicate #'always)))
 
+(defvar-local electric-indent-words '()
+  "Words that should cause automatic reindentation.")
+(add-hook
+ 'electric-indent-functions
+ (lambda (_ch)
+   (save-excursion
+     (backward-word)
+     (looking-at-p (regexp-opt electric-indent-words)))))
+
 ;;; vi emulation
 (straight-use-package 'evil)
 (straight-use-package 'undo-tree)
@@ -49,8 +59,9 @@
 (straight-use-package 'evil-visualstar)
 (setq
  ;; Behave more like Vim
- evil-want-C-u-delete t
  evil-want-C-u-scroll t
+ evil-want-C-u-delete t
+ evil-want-C-g-bindings t
  evil-start-of-line t
  evil-search-module 'evil-search
  evil-ex-search-highlight-all nil ; No hlsearch
@@ -128,44 +139,43 @@
 (defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
   (comment-normalize-vars t)
-  (let ((prefix (and (length> fill-prefix 0) (regexp-quote fill-prefix)))
+  (let ((prefix (when fill-prefix (regexp-quote fill-prefix)))
         (erei (comment-padleft
                (comment-string-reverse (or comment-continue comment-start)) 're))
-        (spt (progn (goto-char beg) (line-beginning-position 2))) (next-linec-pt))
+        spt next-linec-pt)
     (save-restriction
       (narrow-to-region
-       (or (comment-beginning) beg)
-       (progn (goto-char (1- end)) (end-of-line (when (<= end spt) 2)) (point)))
+       (progn (goto-char beg) (or (comment-beginning) beg))
+       (progn (goto-char (max (1- end) beg))
+              (end-of-line (when (<= (line-beginning-position) beg) 2)) (point)))
       (insert ?\n)
       (goto-char (point-min))
-      (while (and (not (eobp))
-                  (setq spt (comment-search-forward (point-max) t)))
-        (let ((npt (line-beginning-position 2)) (iept (point-max)) (ept))
+      (while (setq spt (comment-search-forward (point-max) t))
+        (let ((npt (line-beginning-position 2)) (iept (point-max)))
           (if (when (progn (goto-char spt) (comment-forward))
-                (setq ept (point)
-                      iept (save-excursion (comment-enter-backward) (point)))
-                (= ept npt)) ; Line comments generally include NL
+                (setq iept (save-excursion (comment-enter-backward) (point)))
+                (= (point) npt)) ; Line comments generally include NL
               (progn ; Join line comments
-                (and next-linec-pt (= spt next-linec-pt)
-                     (uncomment-region spt ept))
+                (when (eql spt next-linec-pt) (uncomment-region spt (point)))
                 (setq next-linec-pt (progn (skip-chars-forward " \t") (point))))
             (save-excursion ; Eliminate continuation markers
-              (goto-char spt)
-              (dotimes (_ (1- (count-lines spt iept)))
-                (forward-line)
-                (when (and (< beg (point)) (looking-at erei))
+              (goto-char (max beg spt))
+              (while (progn (forward-line) (< (point) iept))
+                (when (looking-at erei)
+                  (setq iept (- iept (- (match-end 0) (match-beginning 0))))
                   (replace-match "" t t)))))))
       (goto-char beg)
-      (setq spt nil)
+      (setq end nil)
       (while (progn (forward-line) (not (eobp)))
-        (and prefix (looking-at prefix) (replace-match "" t t))
-        (delete-region (1- (point)) (progn (skip-chars-forward " \t") (point)))
-        (setq spt (point))
+        (delete-region
+         (setq end (1- (point)))
+         (progn (and prefix (looking-at prefix) (goto-char (match-end 0)))
+                (skip-chars-forward " \t") (point)))
         (or (memq (following-char) '(0 ?\n ?\)))
             (memq (preceding-char) '(0 ?\n ?\t ?\s))
-            (insert ?\s)))
-      (delete-char -1)
-      (if spt (goto-char spt) (signal 'end-of-buffer nil)))))
+            (insert ?\s))))
+    (delete-char -1)
+    (goto-char (or end (signal 'end-of-buffer nil)))))
 (advice-add #'evil-join :override #'comment-join-line)
 
 (evil-define-operator evil-comment (beg end)
@@ -425,7 +435,7 @@ mode buffer."
      (/= (yas--field-start active-field) (point)))))
 
 ;;; Insert mode completion
-(straight-use-package 'company-mode)
+(straight-use-package 'company)
 (with-eval-after-load 'company
   (setq company-idle-delay nil
         company-require-match nil
@@ -537,6 +547,9 @@ Works with: statement, statement-cont."
 (add-hook 'rust-mode-hook
           (lambda () (setq indent-tabs-mode nil)))
 
+(add-hook 'sh-mode-hook
+          (lambda () (setq electric-indent-words '("fi" "else" "done" "esac"))))
+
 (setq markdown-indent-on-enter 'indent-and-new-item)
 
 (straight-use-package 'typescript-mode)
@@ -552,14 +565,22 @@ Works with: statement, statement-cont."
 
 (straight-use-package 'haskell-mode)
 (straight-use-package 'yaml-mode)
-(straight-use-package 'nix-mode)
 (straight-use-package 'cmake-mode)
-(straight-use-package 'lua-mode)
 (straight-use-package 'julia-mode)
+
+(straight-use-package 'nix-mode)
+(add-hook 'nix-mode-hook
+          (lambda () (setq electric-indent-words '("else"))))
+
+(straight-use-package 'lua-mode)
+(add-hook 'lua-mode-hook
+          (lambda () (setq electric-indent-words '("end" "else"))))
 
 (setq erlang-electric-commands '(erlang-electric-semicolon
                                  erlang-electric-gt
                                  erlang-electric-newline))
+(add-hook 'erlang-mode-hook
+          (lambda () (setq electric-indent-words '("end"))))
 
 ;; Lazily lookup path to Agda mode
 (push '("\\.l?agda\\'" .
