@@ -222,9 +222,9 @@
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
 (advice-add #'evil-ex :around #'with-cwd)
 
-(let ((find-files-program (cond
-                           ((executable-find "rg") '("rg" "--color=never" "--files"))
-                           ((executable-find "find") '("find" "-type" "f")))))
+(let ((find-files-program
+       (cond ((executable-find "rg") '("rg" "--color=never" "--files"))
+             ((executable-find "find") '("find" "-type" "f")))))
   (defun find-file-rec ()
     "Find a file in the current working directory recursively."
     (interactive)
@@ -243,8 +243,8 @@
 (evil-define-key 'normal dired-mode-map
   "j" 'dired-next-line "k" 'dired-previous-line
   "e" 'find-file "I" 'dired-toggle-read-only)
-(evil-define-key 'normal wdired-mode-map
-  "ZQ" 'wdired-abort-changes "ZZ" 'wdired-finish-edit)
+(evil-define-key nil wdired-mode-map
+  [remap evil-write] 'wdired-finish-edit)
 
 (defun sudo-file-name (file)
   "Return TRAMP file name for editing FILE as root with sudo."
@@ -299,7 +299,8 @@
    mode-line-position))
 
 ;;; Reading documentation
-(setq help-window-select t)
+(setq help-window-select t
+      describe-bindings-outline t)
 (evil-define-key 'normal help-mode-map
   "\C-t" 'help-go-back
   "s" 'help-view-source)
@@ -464,6 +465,42 @@ cycle indentation where you otherwise would only be cycling forever."
         (company-complete-common)
       (company-indent-or-complete-common arg))))
 
+(defun my-company-files (command &rest r)
+  "`company-mode' completion backend for existing file names.
+Unlike `company-files' relative paths do not have to begin with \"./\",
+and the value of `completion-styles' is used."
+  (interactive (list 'interactive))
+  (let ((f (lambda ()
+             (require 'ffap)
+             (let* ((s (ffap-string-at-point))
+                    (prefix (if s (substring s 0 (- (point) (car ffap-string-at-point-region))) ""))
+                    (dir (or (file-name-directory prefix) "")))
+               (nconc ; Delimit to single path component
+                (if s (list (+ (car ffap-string-at-point-region) (length dir))
+                            (if-let ((/-pos (string-search "/" s (length dir))))
+                                    (+ (car ffap-string-at-point-region) /-pos)
+                                  (cadr ffap-string-at-point-region)))
+                  (list (point) (point)))
+                (list
+                 ;; Indicates directories with trailing slash unlike directory-files
+                 (file-name-all-completions "" dir)
+                 :predicate (lambda (file) (not (member file '("./" "../"))))
+                 :company-kind
+                 (lambda (file) (if (eq (aref file (1- (length file))) ?/) 'folder 'file))
+                 :exit-function ; If completed directory: Continue completing descendants
+                 (lambda (string status)
+                   ;; company-backend is let-bound here, but not during company-after-completion-hook
+                   (cl-labels ((f (_)
+                                  (remove-hook 'company-after-completion-hook #'f)
+                                  (company-begin-backend 'my-company-files)))
+                     (and (eq status 'finished) (eq (aref string (1- (length string))) ?/)
+                          (add-hook 'company-after-completion-hook #'f))))))))))
+    (if (eq command 'interactive)
+        (progn (unless (bound-and-true-p company-mode) (company-mode))
+               (company-begin-backend 'my-company-files))
+      (let ((completion-at-point-functions (list f)))
+        (apply #'company-capf command r)))))
+
 ;;; Language server protocol
 (straight-use-package 'lsp-mode)
 (setq lsp-keymap-prefix "<leader> l"
@@ -504,6 +541,8 @@ cycle indentation where you otherwise would only be cycling forever."
   (kbd "<leader>G") 'magit-file-dispatch)
 (evil-define-key 'motion 'global
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
+(evil-define-key 'insert 'global
+  (kbd "C-x C-f") 'my-company-files)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
