@@ -350,7 +350,8 @@ mode buffer."
 ;;; Magit
 (straight-use-package 'magit)
 (setq git-commit-summary-max-length 50
-      git-commit-fill-column 72)
+      git-commit-fill-column 72
+      magit-status-goto-file-position t)
 (with-eval-after-load 'transient
   (define-key transient-base-map [escape] 'transient-quit-one)
   (define-key transient-sticky-map [escape] 'transient-quit-seq))
@@ -413,7 +414,7 @@ mode buffer."
     (kbd "RET") '(menu-item "" smerge-dispatch :enable (evil-normal-state-p))))
 (evil-define-motion evil-forward-conflict (count)
   "Move the cursor to the beginning of the COUNT-th next conflict."
-  :jump t :type exclusive
+  :jump t
   (require 'smerge-mode)
   (smerge-next count)
   (unless smerge-mode (smerge-mode)))
@@ -521,6 +522,15 @@ and the value of `completion-styles' is used."
           (lsp--filter-clients (-andfn #'lsp--supports-buffer?
                                        #'lsp--server-binary-present?))
           (lsp)))))
+
+;;; Spell checking
+(setq ispell-silently-savep t)
+(advice-add #'evil-next-flyspell-error :before
+            (lambda (&rest _) (unless (bound-and-true-p flyspell-mode)
+                                (flyspell-mode) (flyspell-buffer))))
+(with-eval-after-load 'flyspell
+  (define-key flyspell-mouse-map
+    (kbd "RET") '(menu-item "" ispell-word :enable (evil-normal-state-p))))
 
 (evil-define-key 'normal 'global
   "gc" 'evil-comment
