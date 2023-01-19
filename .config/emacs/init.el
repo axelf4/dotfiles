@@ -473,29 +473,20 @@ and the value of `completion-styles' is used."
   (interactive (list 'interactive))
   (let ((f (lambda ()
              (require 'ffap)
-             (let* ((s (ffap-string-at-point))
-                    (prefix (if s (substring s 0 (- (point) (car ffap-string-at-point-region))) ""))
-                    (dir (or (file-name-directory prefix) "")))
-               (nconc ; Delimit to single path component
-                (if s (list (+ (car ffap-string-at-point-region) (length dir))
-                            (if-let ((/-pos (string-search "/" s (length dir))))
-                                    (+ (car ffap-string-at-point-region) /-pos)
-                                  (cadr ffap-string-at-point-region)))
-                  (list (point) (point)))
-                (list
-                 ;; Indicates directories with trailing slash unlike directory-files
-                 (file-name-all-completions "" dir)
-                 :predicate (lambda (file) (not (member file '("./" "../"))))
-                 :company-kind
-                 (lambda (file) (if (eq (aref file (1- (length file))) ?/) 'folder 'file))
-                 :exit-function ; If completed directory: Continue completing descendants
-                 (lambda (string status)
-                   ;; company-backend is let-bound here, but not during company-after-completion-hook
-                   (cl-labels ((f (_)
-                                  (remove-hook 'company-after-completion-hook #'f)
-                                  (company-begin-backend 'my-company-files)))
-                     (and (eq status 'finished) (eq (aref string (1- (length string))) ?/)
-                          (add-hook 'company-after-completion-hook #'f))))))))))
+             (ffap-string-at-point)
+             `(,@ffap-string-at-point-region
+               completion-file-name-table
+               :predicate ,(lambda (x) (not (string= x "./")))
+               :company-kind
+               ,(lambda (x) (if (eq (aref x (1- (length x))) ?/) 'folder 'file))
+               :exit-function ; Continue completing descendants of directory
+               ,(lambda (string _status)
+                  ;; company-backend is let-bound here, but not during company-after-completion-hook
+                  (cl-labels ((f (_)
+                                 (remove-hook 'company-after-completion-hook #'f)
+                                 (company-begin-backend 'my-company-files)))
+                    (when (eq (aref string (1- (length string))) ?/)
+                      (add-hook 'company-after-completion-hook #'f))))))))
     (if (eq command 'interactive)
         (progn (unless (bound-and-true-p company-mode) (company-mode))
                (company-begin-backend 'my-company-files))
