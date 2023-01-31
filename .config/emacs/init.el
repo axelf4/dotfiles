@@ -43,7 +43,7 @@
 (add-hook 'minibuffer-setup-hook
           (lambda () (setq-local electric-pair-inhibit-predicate #'always)))
 
-(defvar-local electric-indent-words '()
+(defvar-local electric-indent-words ()
   "Words that should cause automatic reindentation.")
 (add-hook
  'electric-indent-functions
@@ -77,7 +77,8 @@
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
- evil-motion-state-modes '()
+ evil-motion-state-modes ()
+ evil-mode-line-format nil
  ;; Default fails to mimic Vim by not wrapping before looking in other buffers
  evil-complete-next-func #'dabbrev-expand)
 (evil-mode)
@@ -195,16 +196,29 @@
 
 ;;; Minibuffer completion
 (straight-use-package 'vertico)
-(straight-use-package 'consult)
 (straight-use-package 'hotfuzz)
 (setq completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
       completion-styles '(hotfuzz)
       completion-category-defaults nil
-      completion-in-region-function #'consult-completion-in-region)
+      completion-in-region-function #'minibuffer-completion-in-region)
 (vertico-mode)
 (hotfuzz-vertico-mode)
+
+(defun minibuffer-completion-in-region (start end collection &optional predicate)
+  "Read from minibuffer to complete text between START and END using COLLECTION."
+  (if-let ((completion
+            (completing-read "Completion: " collection predicate nil
+                             (buffer-substring-no-properties start end))))
+      (let ((minibuffer-completion-table collection)
+            (minibuffer-completion-predicate predicate))
+        (completion--replace
+         start end (setq completion (copy-sequence completion)))
+        (completion--done completion 'unknown)
+        t)
+    (unless completion-fail-discreetly (completion--message "No completions"))
+    nil))
 
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
