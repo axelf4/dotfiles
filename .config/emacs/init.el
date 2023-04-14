@@ -1,4 +1,4 @@
-;;; init.el --- Emacs configuration  -*- lexical-binding: t; -*-
+;;; init.el --- Emacs configuration  -*- lexical-binding: t -*-
 
 ;; Bootstrap the straight.el package manager
 (load (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory)
@@ -19,7 +19,6 @@
       kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
       tags-add-tables t
-      next-error-recenter t
       xref-auto-jump-to-first-xref t
       vc-handled-backends nil ; Disable VC
       comment-multi-line t
@@ -201,8 +200,7 @@
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
       completion-styles '(hotfuzz)
-      completion-category-defaults nil
-      completion-in-region-function #'minibuffer-completion-in-region)
+      completion-category-defaults nil)
 (vertico-mode)
 (hotfuzz-vertico-mode)
 
@@ -256,7 +254,7 @@
 (evil-define-key nil dired-mode-map (kbd "SPC") nil)
 (evil-define-key 'normal dired-mode-map
   "j" 'dired-next-line "k" 'dired-previous-line
-  "e" 'find-file "I" 'dired-toggle-read-only)
+  "f" 'find-file "I" 'dired-toggle-read-only)
 (evil-define-key nil wdired-mode-map
   [remap evil-write] 'wdired-finish-edit)
 
@@ -450,62 +448,142 @@ mode buffer."
                (active-field (yas--snippet-active-field snippet)))
      (/= (yas--field-start active-field) (point)))))
 
+(defun yas-completion-at-point (&optional interactive)
+  "Complete YASnippet snippets."
+  (interactive "p")
+  (if interactive
+      (let ((completion-at-point-functions '(yas-completion-at-point)))
+        (completion-at-point))
+    (pcase (cl-letf (((symbol-function #'yas--fetch)
+                      (lambda (table prefix) ; Filter by prefix instead of exact match
+                        (cl-loop
+                         with regex = (completion-pcm--pattern->regex prefix)
+                         for key being the hash-keys of (yas--table-hash table)
+                         using (hash-values namehash) if (string-match-p regex key)
+                         nconc (yas--namehash-templates-alist namehash) into xs
+                         finally return (yas--filter-templates-by-condition xs)))))
+             (yas--templates-for-key-at-point))
+      (`(,templates . ,region)
+       (let ((table (make-hash-table :test #'equal :size (length templates))))
+         (cl-loop for (_name . template) in templates do
+                  (puthash (yas--template-key template) template table))
+         `(,@region
+           ,table
+           :company-kind ,(lambda (_) 'snippet)
+           :annotation-function ,(lambda (s) (yas--template-name (gethash s table)))
+           :exit-function
+           ,(lambda (s _status)
+              (yas-expand-snippet (gethash s table) (- (point) (length s)) (point)))))))))
+
 ;;; Insert mode completion
-(straight-use-package 'company)
-(with-eval-after-load 'company
-  (setq company-idle-delay nil
-        company-require-match nil
-        company-selection-wrap-around t
-        company-tooltip-align-annotations t
-        company-tooltip-flip-when-above t
-        company-frontends '(company-pseudo-tooltip-frontend company-echo-metadata-frontend)
-        company-backends '((company-yasnippet company-capf :separate)))
-  (add-hook 'evil-normal-state-entry-hook #'company-abort)
-  (evil-define-key nil company-active-map
-    [escape] 'company-abort
-    "\C-w" nil ; Do not shadow `evil-delete-backward-word'
-    (kbd "TAB") 'company-complete-common-or-cycle
-    [backtab] 'company-select-previous))
+(straight-use-package 'corfu)
+(with-eval-after-load 'corfu
+  (let ((kind-text-mapping
+         '((variable "v" . font-lock-variable-name-face)
+           (file "f" . font-lock-string-face)
+           (folder "d" . font-lock-doc-face)
+           (function "f" . font-lock-function-name-face)
+           (keyword "k" . font-lock-keyword-face)
+           (snippet "S" . font-lock-string-face))))
+    (defun kind-margin-formatter (_metadata)
+      (when-let ((kind-fun (plist-get completion-extra-properties :company-kind)))
+        (lambda (s)
+          (if-let (x (alist-get (funcall kind-fun s) kind-text-mapping))
+              (let ((s (format " %s " (car x)))
+                    (face `(:foreground ,(face-attribute (cdr x) :foreground) :weight bold)))
+                (put-text-property 0 (length s) 'face face s)
+                s)
+            "")))))
+  (setq corfu-quit-at-boundary t corfu-quit-no-match t
+        corfu-cycle t
+        corfu-margin-formatters '(kind-margin-formatter))
+  (evil-define-key nil corfu-map
+    [escape] 'corfu-quit
+    (kbd "TAB") 'corfu-next [backtab] 'corfu-previous)
+  (evil-make-overriding-map corfu-map)
+  (dolist (f '(corfu--setup corfu--teardown))
+    (advice-add f :after #'evil-normalize-keymaps))
+
+  (defvar-local corfu-terminal--ovs nil)
+  (defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar)
+    "Show the Corfu `corfu--popup-show' completion popup using overlays."
+    (mapc #'delete-overlay corfu-terminal--ovs)
+    (save-excursion
+      (goto-char pos)
+      (setq corfu-terminal--ovs
+            (cl-loop
+             with pos = (posn-x-y (posn-at-point pos))
+             with x = (- (car pos) (line-number-display-width))
+             with col = (min (max 0 (- x off)) (- (window-text-width) width 2 2))
+             and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
+             for i from 0 and line in lines with nl-p collect
+             (let* ((l (concat line
+                               (propertize " " 'display `(space :align-to ,(+ col width 1)))
+                               (if (and lo (<= lo i (+ lo bar)))
+                                   #(" " 0 1 (face corfu-bar))
+                                 #(" " 0 1 (face corfu-current)))))
+                    (face (if (eql i curr) 'corfu-current 'corfu-default))
+                    (ov (make-overlay
+                         (progn (setq nl-p (/= (vertical-motion (cons col dir)) 0))
+                                (point))
+                         (progn (vertical-motion (cons (+ col width 2) 0))
+                                (point)))))
+               (add-face-text-property 0 (1- (length l)) face nil l)
+               (add-face-text-property 0 (length l) 'default t l)
+               (overlay-put ov 'window (selected-window))
+               (overlay-put ov 'before-string
+                            (concat (unless nl-p (overlay-put ov 'priority i)
+                                            #(" \n" 0 1 (cursor 1)))
+                                    (propertize " " 'display `(space :align-to ,col))
+                                    l))
+               (overlay-put ov 'display "")
+               ov)))))
+  (defun corfu-terminal--popup-hide ()
+    "Hide Corfu overlays popup."
+    (mapc #'delete-overlay corfu-terminal--ovs))
+  (fset #'corfu--popup-support-p #'always)
+  (fset #'corfu--popup-show #'corfu-terminal--popup-show)
+  (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
+  (advice-add ; Restrict height of Corfu popup to fit in window
+   #'corfu--candidates-popup :around
+   (lambda (orig-fun &rest args)
+     (let* ((y (cdr (posn-x-y (posn-at-point (point)))))
+            (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
+       (apply orig-fun args)))))
+(setq completion-in-region-function
+      (lambda (&rest args)
+        (apply (if (minibufferp) #'minibuffer-completion-in-region
+                 (corfu-mode) completion-in-region-function)
+               args)))
 (define-key global-map [remap indent-for-tab-command]
   (lambda (arg)
-    "Perform symbol completion and/or indent the line if in the left margin.
+    "Perform symbol completion and/or indent if in the left margin.
 Differs from having `tab-always-indent' set to `complete' in that it
-always tries to complete if point is right of the left margin. This
-facilitates completion even in programming language modes that do TAB
-cycle indentation where you otherwise would only be cycling forever."
+always tries to complete if point is right of the left margin.
+Otherwise in programming language modes that do TAB cycle indentation
+you would only ever cycle."
     (interactive "P")
     (setq this-command 'indent-for-tab-command)
-    (unless (bound-and-true-p company-mode) (company-mode))
     (if (> (current-column) (current-indentation))
-        (company-complete-common)
-      (company-indent-or-complete-common arg))))
+        (completion-at-point)
+      (let ((tab-always-indent 'complete) transient-mark-mode)
+        (indent-for-tab-command arg)))))
 
-(defun my-company-files (command &rest r)
-  "`company-mode' completion backend for existing file names.
-Unlike `company-files' relative paths do not have to begin with \"./\",
-and the value of `completion-styles' is used."
-  (interactive (list 'interactive))
-  (let ((f (lambda ()
-             (require 'ffap)
-             (ffap-string-at-point)
-             `(,@ffap-string-at-point-region
-               completion-file-name-table
-               :predicate ,(lambda (x) (not (string= x "./")))
-               :company-kind
-               ,(lambda (x) (if (eq (aref x (1- (length x))) ?/) 'folder 'file))
-               :exit-function ; Continue completing descendants of directory
-               ,(lambda (string _status)
-                  ;; company-backend is let-bound here, but not during company-after-completion-hook
-                  (cl-labels ((f (_)
-                                 (remove-hook 'company-after-completion-hook #'f)
-                                 (company-begin-backend 'my-company-files)))
-                    (when (eq (aref string (1- (length string))) ?/)
-                      (add-hook 'company-after-completion-hook #'f))))))))
-    (if (eq command 'interactive)
-        (progn (unless (bound-and-true-p company-mode) (company-mode))
-               (company-begin-backend 'my-company-files))
-      (let ((completion-at-point-functions (list f)))
-        (apply #'company-capf command r)))))
+(defun file-completion-at-point (&optional interactive)
+  "Complete file name at point."
+  (interactive "p")
+  (if interactive
+      (let ((completion-at-point-functions '(file-completion-at-point)))
+        (completion-at-point))
+    (require 'ffap)
+    (ffap-string-at-point)
+    `(,@ffap-string-at-point-region completion-file-name-table
+      :predicate ,(lambda (s) (not (string= s "./"))) :exclusive no
+      :company-kind
+      ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
+      :exit-function ; Continue completing descendants of directory
+      ,(lambda (s _status)
+         (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
 
 ;;; Language server protocol
 (straight-use-package 'lsp-mode)
@@ -539,14 +617,12 @@ and the value of `completion-styles' is used."
 
 (evil-define-key 'normal 'global
   "gc" 'evil-comment
+  [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
   (kbd "<leader>h") 'help-command
   (kbd "<leader>b") 'switch-to-buffer
-  (kbd "<leader>f") 'find-file-rec
-  (kbd "<leader>F") 'dired-jump
-  [f9] 'compile-or-recompile
-  (kbd "<leader>e") 'pp-eval-last-sexp
-  (kbd "<leader>E") 'eval-defun
+  (kbd "<leader>f") 'find-file-rec (kbd "<leader>F") 'dired-jump
+  (kbd "<leader>e") 'pp-eval-last-sexp (kbd "<leader>E") 'eval-defun
 
   (kbd "<leader>g")
   (lambda ()
@@ -554,10 +630,11 @@ and the value of `completion-styles' is used."
     (interactive)
     (magit-status-setup-buffer (cwd)))
   (kbd "<leader>G") 'magit-file-dispatch)
+(define-key universal-argument-map (kbd "<leader>u") 'universal-argument-more)
 (evil-define-key 'motion 'global
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
 (evil-define-key 'insert 'global
-  (kbd "C-x C-f") 'my-company-files)
+  (kbd "C-x C-f") 'file-completion-at-point)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
@@ -604,6 +681,7 @@ Works with: statement, statement-cont."
 (add-hook 'sh-mode-hook
           (lambda () (setq electric-indent-words '("fi" "else" "done" "esac"))))
 
+(straight-use-package 'markdown-mode)
 (setq markdown-indent-on-enter 'indent-and-new-item)
 
 (straight-use-package 'typescript-mode)
