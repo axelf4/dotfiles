@@ -54,7 +54,6 @@
 ;;; vi emulation
 (straight-use-package 'evil)
 (straight-use-package 'undo-tree)
-(straight-use-package 'evil-numbers)
 (straight-use-package 'evil-visualstar)
 (setq
  ;; Behave more like Vim
@@ -84,22 +83,6 @@
 (evil-set-leader 'motion (kbd "SPC"))
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
 (add-hook 'evil-local-mode-hook #'evil-visualstar-mode)
-(evil-define-key 'normal 'global
-  "\C-^" 'evil-switch-to-windows-last-buffer
-  "\C-a" 'evil-numbers/inc-at-pt "\C-x" 'evil-numbers/dec-at-pt
-  (kbd "g C-a") 'evil-numbers/inc-at-pt-incremental
-  (kbd "g C-x") 'evil-numbers/dec-at-pt-incremental
-  "U" 'undo-tree-visualize)
-(evil-define-key 'visual 'global "u" nil)
-(evil-define-key 'insert 'global
-  "\C-f" 'indent-according-to-mode
-  ;; Continue comment on new line
-  [remap newline]
-  '(menu-item "" default-indent-new-line :filter
-              (lambda (_cmd)
-                (when (save-excursion (comment-beginning))
-                  `(lambda () (interactive) (,comment-line-break-function))))))
-(evil-define-key 'normal special-mode-map [escape] 'quit-window)
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
@@ -135,6 +118,87 @@
              (set-window-prev-buffers nil prev-buffers)))))
   (advice-add #'evil-window-split :around f)
   (advice-add #'evil-window-vsplit :around f))
+(evil-define-key 'normal special-mode-map [escape] 'quit-window)
+
+(defun format-binary (num)
+  "Format non-negative integer NUM in binary."
+  (let (digits)
+    (while (> num 0)
+      (push (+ ?0 (logand num 1)) digits)
+      (setq num (ash num -1)))
+    (apply #'string (or digits '(?0)))))
+(defun search-forward-inc (amount &optional bound)
+  "Increment the next number after point ending before BOUND by AMOUNT.
+If fail return nil, otherwise set point to the end of the number found
+and return non-nil."
+  (let (case-fold-search subexp s base)
+    (when (re-search-forward
+           "0[bB]\\([01]+\\)\\|0\\([0-7]+\\)\\|0[xX]\\([[:xdigit:]]+\\)\\|-?[0-9]+"
+           bound t)
+      (cond
+       ((setq s (match-string (setq subexp 1))) (setq base 2)) ; Binary
+       ((setq s (match-string (setq subexp 2))) (setq base 8)) ; Octal
+       ((setq s (match-string (setq subexp 3))) (setq base 16)) ; Hexadecimal
+       (t (setq s (match-string (setq subexp 0)) base 10))) ; Decimal
+      (let ((num (+ (string-to-number s base) amount))
+            (fixedcase (not (and case-replace (eq base 16)))))
+        (replace-match
+         (cond ((eq base 2) (format-binary num))
+               ((eq base 8) (format "%o" num))
+               ((eq base 10) (number-to-string num))
+               ((eq base 16) (format "%x" num)))
+         fixedcase fixedcase nil subexp))
+      t)))
+
+(defun inc-at-point (count &optional cumulative)
+  "Add COUNT to the number at or after the cursor.
+If the region is active, do this on every highlighted line. With
+non-nil argument CUMULATIVE each line will be incremented by an
+additional COUNT."
+  (interactive "p")
+  (setq deactivate-mark t)
+  (cond
+   ((not (evil-visual-state-p))
+    ;; Move backward to start of number
+    (if (when (<= ?0 (char-after) ?1)
+          (skip-chars-backward "01")
+          (and (eq (char-before (1- (point))) ?0) (eq (upcase (char-before)) ?B)))
+        (backward-char 2)
+      (let ((old-pos (point)))
+        (if (when-let ((ch (char-after)) ((or (<= ?0 ch ?9) (<= ?A (upcase ch) ?F))))
+              (skip-chars-backward "[:xdigit:]")
+              (and (eq (char-before (1- (point))) ?0) (eq (upcase (char-before)) ?X)))
+            (backward-char 2)
+          (goto-char old-pos)
+          (when (<= ?0 (char-after) ?9)
+            (skip-chars-backward "0-9")
+            (when (eq (char-before) ?-) (backward-char))))))
+    (unless (search-forward-inc count (line-end-position))
+      (user-error "No number here"))
+    (backward-char))
+   ((eq (evil-visual-type) 'block)
+    (evil-apply-on-block
+     (let ((amount count))
+       (lambda (beg end) (goto-char beg)
+         (and (search-forward-inc amount end)
+              cumulative (setq amount (+ amount count)))))
+     (goto-char evil-visual-beginning) evil-visual-end nil))
+   (t (goto-char evil-visual-beginning)
+      (let ((amount count))
+        (while (and (< (point) evil-visual-end)
+                    (search-forward-inc amount evil-visual-end))
+          (when cumulative (setq amount (+ amount count)))
+          (forward-line)))
+      (goto-char evil-visual-beginning))))
+(defun dec-at-point (count)
+  (interactive "p")
+  (inc-at-point (- count)))
+(defun inc-at-point-cumulative (count)
+  (interactive "p")
+  (inc-at-point count t))
+(defun dec-at-point-cumulative (count)
+  (interactive "p")
+  (inc-at-point (- count) t))
 
 (defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
@@ -248,6 +312,7 @@
 ;; File browsing
 (setq dired-auto-revert-buffer #'dired-directory-changed-p
       dired-dwim-target t
+      dired-recursive-copies 'always dired-recursive-deletes 'always
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
 (evil-set-initial-state 'wdired-mode 'normal)
@@ -347,9 +412,8 @@ Unlike `recompile' it is not necessary to run this in the Compilation
 mode buffer."
   (interactive)
   (require 'compile)
-  (if-let ((buf (get-buffer (compilation-buffer-name "compilation"
-                                                     'compilation-mode
-                                                     nil))))
+  (if-let ((buf (get-buffer (compilation-buffer-name
+                             "compilation" 'compilation-mode nil))))
       (with-current-buffer buf (recompile))
     (call-interactively #'compile)))
 (evil-declare-not-repeat #'compile-or-recompile)
@@ -616,6 +680,9 @@ you would only ever cycle."
     (kbd "RET") '(menu-item "" ispell-word :enable (evil-normal-state-p))))
 
 (evil-define-key 'normal 'global
+  "\C-^" 'evil-switch-to-windows-last-buffer
+  "\C-a" 'inc-at-point "\C-x" 'dec-at-point
+  "U" 'undo-tree-visualize
   "gc" 'evil-comment
   [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
@@ -633,7 +700,17 @@ you would only ever cycle."
 (define-key universal-argument-map (kbd "<leader>u") 'universal-argument-more)
 (evil-define-key 'motion 'global
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
+(evil-define-key 'visual 'global
+  "u" nil
+  (kbd "g C-a") 'inc-at-point-cumulative (kbd "g C-x") 'dec-at-point-cumulative)
 (evil-define-key 'insert 'global
+  "\C-f" 'indent-according-to-mode
+  ;; Continue comment on new line
+  [remap newline]
+  '(menu-item "" default-indent-new-line :filter
+              (lambda (_cmd)
+                (when (save-excursion (comment-beginning))
+                  `(lambda () (interactive) (,comment-line-break-function)))))
   (kbd "C-x C-f") 'file-completion-at-point)
 
 ;;; Language support
@@ -683,6 +760,8 @@ Works with: statement, statement-cont."
 
 (straight-use-package 'markdown-mode)
 (setq markdown-indent-on-enter 'indent-and-new-item)
+
+(add-hook 'latex-mode-hook #'reftex-mode)
 
 (straight-use-package 'typescript-mode)
 (defun add-node-modules-to-path ()
