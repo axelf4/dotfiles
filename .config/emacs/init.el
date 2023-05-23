@@ -263,6 +263,7 @@ additional COUNT."
 (setq completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
+      read-extended-command-predicate #'command-completion-default-include-p
       completion-styles '(hotfuzz)
       completion-category-defaults nil)
 (vertico-mode)
@@ -573,35 +574,32 @@ mode buffer."
     "Show the Corfu `corfu--popup-show' completion popup using overlays."
     (mapc #'delete-overlay corfu-terminal--ovs)
     (save-excursion
-      (goto-char pos)
-      (setq corfu-terminal--ovs
-            (cl-loop
-             with pos = (posn-x-y (posn-at-point pos))
-             with x = (- (car pos) (line-number-display-width))
-             with col = (min (max 0 (- x off)) (- (window-text-width) width 2 2))
-             and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
-             for i from 0 and line in lines with nl-p collect
-             (let* ((l (concat line
-                               (propertize " " 'display `(space :align-to ,(+ col width 1)))
-                               (if (and lo (<= lo i (+ lo bar)))
-                                   #(" " 0 1 (face corfu-bar))
-                                 #(" " 0 1 (face corfu-current)))))
-                    (face (if (eql i curr) 'corfu-current 'corfu-default))
-                    (ov (make-overlay
-                         (progn (setq nl-p (/= (vertical-motion (cons col dir)) 0))
-                                (point))
-                         (progn (vertical-motion (cons (+ col width 2) 0))
-                                (point)))))
-               (add-face-text-property 0 (1- (length l)) face nil l)
-               (add-face-text-property 0 (length l) 'default t l)
-               (overlay-put ov 'window (selected-window))
-               (overlay-put ov 'before-string
-                            (concat (unless nl-p (overlay-put ov 'priority i)
-                                            #(" \n" 0 1 (cursor 1)))
-                                    (propertize " " 'display `(space :align-to ,col))
-                                    l))
-               (overlay-put ov 'display "")
-               ov)))))
+      (cl-loop
+       with pos = (posn-x-y (posn-at-point (goto-char pos)))
+       with x = (- (car pos) (line-number-display-width))
+       with col = (min (max 0 (- x off)) (- (window-text-width) width 4))
+       and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
+       for i from 0 and line in lines with nl-p collect
+       (let ((l (concat line (propertize " " 'display `(space :align-to ,(+ col width 1)))))
+             (face (if (= i curr) 'corfu-current 'corfu-default))
+             (ov (make-overlay
+                  (progn (setq nl-p (/= (vertical-motion (cons col dir)) 0)) (point))
+                  (progn (vertical-motion (cons (+ col width 2) 0)) (point))
+                  nil t t)))
+         (add-face-text-property 0 (length l) face nil l)
+         (add-face-text-property 0 (length l) 'default t l)
+         (overlay-put ov 'window (selected-window))
+         (overlay-put ov 'before-string
+                      (concat (unless nl-p (overlay-put ov 'priority i)
+                                      #(" \n" 0 1 (cursor 1)))
+                              (propertize " " 'display `(space :align-to ,col))
+                              l
+                              (if (and lo (<= lo i (+ lo bar)))
+                                  #(" " 0 1 (face (corfu-bar default)))
+                                #(" " 0 1 (face (corfu-current default))))))
+         (overlay-put ov 'display "")
+         ov)
+       into ovs finally (setq corfu-terminal--ovs ovs))))
   (defun corfu-terminal--popup-hide ()
     "Hide Corfu overlays popup."
     (mapc #'delete-overlay corfu-terminal--ovs))
