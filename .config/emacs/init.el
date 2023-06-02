@@ -305,9 +305,8 @@ additional COUNT."
   (defun find-file-rec ()
     "Find a file in the current working directory recursively."
     (interactive)
-    (find-file
-     (completing-read "Find file: "
-                      (apply #'process-lines find-files-program)))))
+    (find-file (completing-read
+                "Find file: " (apply #'process-lines find-files-program)))))
 (advice-add #'find-file-rec :around #'with-cwd)
 
 ;; File browsing
@@ -569,47 +568,63 @@ mode buffer."
   (dolist (f '(corfu--setup corfu--teardown))
     (advice-add f :after #'evil-normalize-keymaps))
 
-  (defvar-local corfu-terminal--ovs nil)
-  (defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar)
+  (defvar-local corfu-terminal--ov nil)
+  (cl-defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar &aux save-pos buffer)
     "Show the Corfu `corfu--popup-show' completion popup using overlays."
-    (mapc #'delete-overlay corfu-terminal--ovs)
-    (save-excursion
-      (cl-loop
-       with pos = (posn-x-y (posn-at-point (goto-char pos)))
-       with x = (- (car pos) (line-number-display-width))
-       with col = (min (max 0 (- x off)) (- (window-text-width) width 4))
-       and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
-       for i from 0 and line in lines with nl-p collect
-       (let ((l (concat line (propertize " " 'display `(space :align-to ,(+ col width 1)))))
-             (face (if (= i curr) 'corfu-current 'corfu-default))
-             (ov (make-overlay
-                  (progn (setq nl-p (/= (vertical-motion (cons col dir)) 0)) (point))
-                  (progn (vertical-motion (cons (+ col width 2) 0)) (point))
-                  nil t t)))
-         (add-face-text-property 0 (length l) face nil l)
-         (add-face-text-property 0 (length l) 'default t l)
-         (overlay-put ov 'window (selected-window))
-         (overlay-put ov 'before-string
-                      (concat (unless nl-p (overlay-put ov 'priority i)
-                                      #(" \n" 0 1 (cursor 1)))
-                              (propertize " " 'display `(space :align-to ,col))
-                              l
-                              (if (and lo (<= lo i (+ lo bar)))
-                                  #(" " 0 1 (face (corfu-bar default)))
-                                #(" " 0 1 (face (corfu-current default))))))
-         (overlay-put ov 'display "")
-         ov)
-       into ovs finally (setq corfu-terminal--ovs ovs))))
+    (when corfu-terminal--ov (delete-overlay corfu-terminal--ov))
+    (setq save-pos (point)
+          buffer (make-indirect-buffer (current-buffer) (generate-new-buffer-name " *temp*") nil t))
+    (unwind-protect
+        (cl-loop
+         with pos = (posn-x-y (posn-at-point (goto-char pos)))
+         with col = (min (max 0 (- (car pos) (line-number-display-width) off))
+                         (- (window-text-width) width 4))
+         and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
+         with sp = (save-excursion (vertical-motion (max 0 dir)) (point))
+         initially (vertical-motion (cons (if (< dir 0) 0 (- (window-width) 2)) 0))
+         for i from 0 and line in lines and op = sp then np with np and nl-p and j = 1 and xs do
+         (let ((l (concat line (propertize " " 'display `(space :align-to ,(+ col width 1)))))
+               (face (if (= i curr) 'corfu-current 'corfu-default))
+               (bar (if (and lo (<= lo i (+ lo bar))) #(" " 0 1 (face corfu-bar))
+                      #(" " 0 1 (face corfu-current))))
+               (p0 (point))
+               (p1 (progn (setq nl-p (/= (vertical-motion (cons col (* dir j))) 0)) (point))))
+           (add-face-text-property 0 (length l) face nil l)
+           (setq j (if (= p1 p0) (1+ j) 1)
+                 np (save-excursion (vertical-motion (cons (+ col width 2) 0)) (point)))
+           (when (eq (< dir 0) (<= p1 np)) (cl-rotatef p1 np))
+           (when (> op p1) (cl-rotatef op p1))
+           ;; One visual line can be many logical lines (e.g. fold overlay)
+           (cl-destructuring-bind (pos _hpos vpos . _)
+               (with-current-buffer buffer
+                 (compute-motion op (cons (+ col width 2) 0) p1 (cons col 1)
+                                 nil (cons (window-hscroll) 0) nil))
+             (push (buffer-substring op (if (> vpos 1) (1- pos) pos)) xs)
+             (and (not (and (> dir 0) (= i 0) nl-p)) (< vpos 1) (push #(" \n" 0 1 (cursor 1)) xs)))
+           (push (concat (propertize " " 'display `(space :align-to ,col)) l bar) xs))
+         finally (goto-char np)
+         (if (> dir 0) (setq xs (nreverse xs))
+           (while (and (> j 1) (/= (vertical-motion (cons (- (window-width) 2) (- j))) 0) (= (point) np))
+             (cl-incf j) (push "\n" xs)))
+         (let ((ov (setq corfu-terminal--ov (make-overlay sp (point) nil t t)))
+               (s (apply #'concat xs)))
+           (remove-list-of-text-properties 0 (length s) '(line-prefix) s)
+           (add-face-text-property 0 (length s) 'default t s)
+           (overlay-put ov 'window (selected-window))
+           (overlay-put ov 'before-string s)
+           (overlay-put ov 'display ""))))
+    (kill-buffer buffer) (goto-char save-pos))
   (defun corfu-terminal--popup-hide ()
     "Hide Corfu overlays popup."
-    (mapc #'delete-overlay corfu-terminal--ovs))
+    (delete-overlay corfu-terminal--ov))
   (fset #'corfu--popup-support-p #'always)
   (fset #'corfu--popup-show #'corfu-terminal--popup-show)
   (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
-  (advice-add ; Restrict height of Corfu popup to fit in window
+  (advice-add ; Restrict size of Corfu popup to fit in window
    #'corfu--candidates-popup :around
    (lambda (orig-fun &rest args)
      (let* ((y (cdr (posn-x-y (posn-at-point (point)))))
+            (corfu-max-width (min corfu-max-width (- (window-text-width) 4)))
             (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
        (apply orig-fun args)))))
 (setq completion-in-region-function
