@@ -1,9 +1,13 @@
 # Use vi key bindings
 set editing-mode vi
-# Perform file completion in a case insensitive fashion
+# Perform completion in case-insensitive fashion
 set completion-ignore-case On
-# Display matches for ambiguous patterns at first tab press
+# List matches for ambiguous words at first Tab press
 set show-all-if-ambiguous On
-# Always complete common prefix
+set colored-completion-prefix On
+# Initially complete only common prefix
 set menu-complete-display-prefix On
+
+# Cycle between completions
 TAB: menu-complete
+"\e[Z": menu-complete-backward
