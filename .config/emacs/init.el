@@ -576,10 +576,10 @@ mode buffer."
           buffer (make-indirect-buffer (current-buffer) (generate-new-buffer-name " *temp*") nil t))
     (unwind-protect
         (cl-loop
-         with pos = (posn-x-y (posn-at-point (goto-char pos)))
-         with col = (min (max 0 (- (car pos) (line-number-display-width) off))
+         with (x . y) = (posn-x-y pos)
+         with col = (min (max 0 (- x (line-number-display-width) off))
                          (- (window-text-width) width 4))
-         and dir = (if (< (+ (cdr pos) (length lines)) (window-text-height)) 1 -1)
+         and dir = (if (< (+ y (length lines)) (window-text-height)) 1 -1)
          with sp = (save-excursion (vertical-motion (max 0 dir)) (point))
          initially (vertical-motion (cons (if (< dir 0) 0 (- (window-width) 2)) 0))
          for i from 0 and line in lines and op = sp then np with np and nl-p and j = 1 and xs do
@@ -591,8 +591,8 @@ mode buffer."
                (p1 (progn (setq nl-p (/= (vertical-motion (cons col (* dir j))) 0)) (point))))
            (add-face-text-property 0 (length l) face nil l)
            (setq j (if (= p1 p0) (1+ j) 1)
-                 np (save-excursion (vertical-motion (cons (+ col width 2) 0)) (point)))
-           (when (eq (< dir 0) (<= p1 np)) (cl-rotatef p1 np))
+                 np (max p1 (save-excursion (vertical-motion (cons (+ col width 2) 0)) (point))))
+           (when (< dir 0) (cl-rotatef p1 np))
            (when (> op p1) (cl-rotatef op p1))
            ;; One visual line can be many logical lines (e.g. fold overlay)
            (cl-destructuring-bind (pos _hpos vpos . _)
@@ -622,11 +622,11 @@ mode buffer."
   (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
   (advice-add ; Restrict size of Corfu popup to fit in window
    #'corfu--candidates-popup :around
-   (lambda (orig-fun &rest args)
-     (let* ((y (cdr (posn-x-y (posn-at-point (point)))))
+   (lambda (orig-fun pos)
+     (let* ((y (cdr (posn-x-y pos)))
             (corfu-max-width (min corfu-max-width (- (window-text-width) 4)))
             (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
-       (apply orig-fun args)))))
+       (funcall orig-fun pos)))))
 (setq completion-in-region-function
       (lambda (&rest args)
         (apply (if (minibufferp) #'minibuffer-completion-in-region
