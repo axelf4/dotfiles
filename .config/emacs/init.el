@@ -391,8 +391,7 @@ additional COUNT."
 (straight-use-package 'xterm-color)
 (setq compilation-scroll-output t
       compilation-ask-about-save nil ; Save before compilation
-      ;; Make compilations unique per frame
-      compilation-buffer-name-function
+      compilation-buffer-name-function ; Make compilations unique per frame
       (lambda (name-of-mode)
         (concat "*" (downcase name-of-mode) "-" (frame-parameter nil 'name) "*"))
       compilation-environment '("TERM=xterm-256color"))
@@ -486,8 +485,8 @@ mode buffer."
      ["Other"
       ("C" "Combine" smerge-combine-with-next)
       ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
-  (define-key (plist-get smerge-text-properties 'keymap)
-    (kbd "RET") '(menu-item "" smerge-dispatch :enable (evil-normal-state-p))))
+  (define-key (plist-get smerge-text-properties 'keymap) (kbd "RET")
+    `(menu-item "" smerge-dispatch :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd)))))
 (evil-define-motion evil-forward-conflict (count)
   "Move the cursor to the beginning of the COUNT-th next conflict."
   :jump t
@@ -578,7 +577,7 @@ mode buffer."
         (cl-loop
          with (x . y) = (posn-x-y pos)
          with col = (min (max 0 (- x (line-number-display-width) off))
-                         (- (window-text-width) width 4))
+                         (- (window-text-width) width 5))
          and dir = (if (< (+ y (length lines)) (window-text-height)) 1 -1)
          with sp = (save-excursion (vertical-motion (max 0 dir)) (point))
          initially (vertical-motion (cons (if (< dir 0) 0 (- (window-width) 2)) 0))
@@ -624,7 +623,7 @@ mode buffer."
    #'corfu--candidates-popup :around
    (lambda (orig-fun pos)
      (let* ((y (cdr (posn-x-y pos)))
-            (corfu-max-width (min corfu-max-width (- (window-text-width) 4)))
+            (corfu-max-width (min corfu-max-width (- (window-text-width) 5)))
             (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
        (funcall orig-fun pos)))))
 (setq completion-in-region-function
@@ -689,8 +688,10 @@ you would only ever cycle."
             (lambda (&rest _) (unless (bound-and-true-p flyspell-mode)
                                 (flyspell-mode) (flyspell-buffer))))
 (with-eval-after-load 'flyspell
-  (define-key flyspell-mouse-map
-    (kbd "RET") '(menu-item "" ispell-word :enable (evil-normal-state-p))))
+  (define-key flyspell-mouse-map (kbd "RET")
+    `(menu-item "" ispell-word :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd)))))
+
+(straight-use-package 'rmsbolt) ; Compiler Explorer
 
 (evil-define-key 'normal 'global
   "\C-^" 'evil-switch-to-windows-last-buffer
