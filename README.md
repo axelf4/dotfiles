@@ -12,7 +12,7 @@ cfg config --local status.showUntrackedFiles no
 ### Install [straight.el]
 
 ```sh
-git clone https://github.com/raxod502/straight.el.git ~/.config/emacs/straight/repos/straight.el
+git clone https://github.com/radian-software/straight.el.git ~/.config/emacs/straight/repos/straight.el
 ```
 
 ## Bash startup files
