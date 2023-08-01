@@ -54,7 +54,6 @@
 ;;; vi emulation
 (straight-use-package 'evil)
 (straight-use-package 'undo-tree)
-(straight-use-package 'evil-visualstar)
 (setq
  ;; Behave more like Vim
  evil-want-C-u-scroll t
@@ -82,7 +81,6 @@
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
-(add-hook 'evil-local-mode-hook #'evil-visualstar-mode)
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
@@ -119,6 +117,18 @@
   (advice-add #'evil-window-split :around f)
   (advice-add #'evil-window-vsplit :around f))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
+;; Visual "*": Search for the selected text instead of the word at point
+(advice-add
+ #'evil-ex-start-word-search :around
+ (lambda (oldfun unbounded direction count &optional symbol)
+   (if (or (not (evil-visual-state-p)) unbounded)
+       (funcall oldfun unbounded direction count symbol)
+     (setq deactivate-mark t)
+     (cl-letf (((symbol-function #'evil-find-thing)
+                (lambda (&rest _)
+                  (buffer-substring-no-properties
+                   (goto-char evil-visual-beginning) evil-visual-end))))
+       (funcall oldfun t direction count)))))
 
 (defun format-binary (num)
   "Format non-negative integer NUM in binary."
@@ -218,7 +228,7 @@ additional COUNT."
         (let ((npt (line-beginning-position 2)) (iept (point-max)))
           (if (when (progn (goto-char spt) (comment-forward))
                 (setq iept (save-excursion (comment-enter-backward) (point)))
-                (= (point) npt)) ; Line comments generally include NL
+                (= (point) npt)) ; Line comments include NL
               (progn ; Join line comments
                 (when (eql spt next-linec-pt) (uncomment-region spt (point)))
                 (setq next-linec-pt (progn (skip-chars-forward " \t") (point))))
@@ -370,9 +380,8 @@ additional COUNT."
  '("%e " ; Out-of-memory indication
    mode-line-buffer-identification mode-line-modified
    ;; Right-justified ruler
-   (:eval (let* ((rhs (format-mode-line mode-line-position))
-                 (hpos (- (window-width) (string-width rhs) 1)))
-            (propertize " " 'display `(space :align-to ,hpos))))
+   (:eval (let ((len (string-width (format-mode-line mode-line-position))))
+            (propertize " " 'display `(space :align-to (- right ,(1+ len))))))
    mode-line-position))
 
 ;;; Reading documentation
@@ -462,11 +471,10 @@ mode buffer."
   "s" 'magit-stage-file "S" 'magit-stage-modified
   "u" 'magit-unstage "U" 'magit-unstage-all
   "x" 'magit-delete-thing "X" 'magit-reset
-  "gs" 'magit-stash
+  "gz" 'magit-stash
   "gr" 'magit-refresh "gR" 'magit-refresh-all
-  "g?" 'magit-dispatch
-  "+" 'magit-diff-more-context "-" 'magit-diff-less-context
-  "!" 'magit-git-command)
+  "g?" 'magit-dispatch "!" 'magit-git-command
+  "+" 'magit-diff-more-context "-" 'magit-diff-less-context)
 
 (with-eval-after-load 'smerge-mode
   (require 'transient)
