@@ -2,11 +2,11 @@ defaults
 auth
 tls
 
-account axelf.nu
+account axelf.se
 host smtp.sendgrid.net
 tls_starttls off
-from axel@axelf.nu
+from axel@axelf.se
 user apikey
 passwordeval "kwallet-query --read-password msmtp/sendgrid kdewallet"
 
-account default : axelf.nu
+account default : axelf.se
