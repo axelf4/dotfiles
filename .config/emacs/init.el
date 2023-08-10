@@ -88,12 +88,11 @@
   [remap completion-at-point] nil
   "\C-n" 'next-line "\C-p" 'previous-line)
 ;; Always use blank lines as paragraph delimiters in motions/text objects
-(advice-add #'forward-evil-paragraph :around
-            (lambda (orig-fun &rest args)
-              (let ((paragraph-start (default-value 'paragraph-start))
-                    (paragraph-separate (default-value 'paragraph-separate))
-                    (paragraph-ignore-fill-prefix t))
-                (apply orig-fun args))))
+(define-advice forward-evil-paragraph (:around (orig-fun &rest args))
+  (let ((paragraph-start (default-value 'paragraph-start))
+        (paragraph-separate (default-value 'paragraph-separate))
+        (paragraph-ignore-fill-prefix t))
+    (apply orig-fun args)))
 (define-key evil-normal-state-map [remap evil-goto-last-change]
   (evil-define-motion nil (count)
     "Like `goto-last-change' but go to the penultimate change if already there."
@@ -118,17 +117,16 @@
   (advice-add #'evil-window-vsplit :around f))
 (evil-define-key 'normal special-mode-map [escape] 'quit-window)
 ;; Visual "*": Search for the selected text instead of the word at point
-(advice-add
- #'evil-ex-start-word-search :around
- (lambda (oldfun unbounded direction count &optional symbol)
-   (if (or (not (evil-visual-state-p)) unbounded)
-       (funcall oldfun unbounded direction count symbol)
-     (setq deactivate-mark t)
-     (cl-letf (((symbol-function #'evil-find-thing)
-                (lambda (&rest _)
-                  (buffer-substring-no-properties
-                   (goto-char evil-visual-beginning) evil-visual-end))))
-       (funcall oldfun t direction count)))))
+(define-advice evil-ex-start-word-search
+    (:around (oldfun unbounded direction count &optional symbol))
+  (if (or (not (evil-visual-state-p)) unbounded)
+      (funcall oldfun unbounded direction count symbol)
+    (setq deactivate-mark t)
+    (cl-letf (((symbol-function #'evil-find-thing)
+               (lambda (&rest _)
+                 (buffer-substring-no-properties
+                  (goto-char evil-visual-beginning) evil-visual-end))))
+      (funcall oldfun t direction count))))
 
 (defun format-binary (num)
   "Format non-negative integer NUM in binary."
@@ -356,8 +354,8 @@ additional COUNT."
 (evil-ex-define-cmd "gr[ep]" #'grep)
 
 ;; Suppress confirmation of find-file-at-point guess
-(advice-add #'ffap-read-file-or-url :override
-            (lambda (_prompt guess) (or guess (user-error "Can't find file"))))
+(define-advice ffap-read-file-or-url (:override (_prompt guess))
+  (or guess (user-error "Can't find file")))
 
 ;;; Customize mode line
 (setq-default
@@ -408,12 +406,10 @@ additional COUNT."
 (advice-add #'compilation-filter :filter-args
             (cl-function (lambda ((proc string))
                            (list proc (xterm-color-filter string)))))
-(advice-add
- #'compilation-start :around
- (lambda (fun &rest args)
-   (let ((compilation-environment (append compilation-environment
-                                          (frame-parameter nil 'environment))))
-     (apply fun args))))
+(define-advice compilation-start (:around (fun &rest args))
+  (let ((compilation-environment (append compilation-environment
+                                         (frame-parameter nil 'environment))))
+    (apply fun args)))
 (defun compile-or-recompile ()
   "Redo a previous compilation if such exists or prompt for a command.
 Unlike `recompile' it is not necessary to run this in the Compilation
@@ -627,13 +623,12 @@ mode buffer."
   (fset #'corfu--popup-support-p #'always)
   (fset #'corfu--popup-show #'corfu-terminal--popup-show)
   (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
-  (advice-add ; Restrict size of Corfu popup to fit in window
-   #'corfu--candidates-popup :around
-   (lambda (orig-fun pos)
-     (let* ((y (cdr (posn-x-y pos)))
-            (corfu-max-width (min corfu-max-width (- (window-text-width) 5)))
-            (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
-       (funcall orig-fun pos)))))
+  ;; Restrict size of Corfu popup to fit in window
+  (define-advice corfu--candidates-popup (:around (orig-fun pos))
+    (let* ((y (cdr (posn-x-y pos)))
+           (corfu-max-width (min corfu-max-width (- (window-text-width) 5)))
+           (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
+      (funcall orig-fun pos))))
 (setq completion-in-region-function
       (lambda (&rest args)
         (apply (if (minibufferp) #'minibuffer-completion-in-region
@@ -692,9 +687,8 @@ you would only ever cycle."
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
-(advice-add #'evil-next-flyspell-error :before
-            (lambda (&rest _) (unless (bound-and-true-p flyspell-mode)
-                                (flyspell-mode) (flyspell-buffer))))
+(define-advice evil-next-flyspell-error (:before (&rest _))
+  (unless (bound-and-true-p flyspell-mode) (flyspell-mode) (flyspell-buffer)))
 (with-eval-after-load 'flyspell
   (define-key flyspell-mouse-map (kbd "RET")
     `(menu-item "" ispell-word :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd)))))
