@@ -7,6 +7,7 @@
 (setq gc-cons-threshold 16777216
       native-comp-async-report-warnings-errors 'silent
       enable-recursive-minibuffers t
+      translate-upper-case-key-bindings nil
       use-short-answers t
       scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
       truncate-partial-width-windows nil ; Always soft-wrap
@@ -20,6 +21,7 @@
       tags-revert-without-query t
       tags-add-tables t
       xref-auto-jump-to-first-xref t
+      show-paren-predicate t ; Enable Show Paren Mode in special buffers too
       vc-handled-backends nil ; Disable VC
       comment-multi-line t
       sentence-end-double-space nil ; Single space between sentences
@@ -84,8 +86,7 @@
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-ex-completion-map)
-(evil-define-key nil minibuffer-local-map ; but undo remappings...
-  [remap completion-at-point] nil
+(evil-define-key* nil minibuffer-local-map ; but undo remappings...
   "\C-n" 'next-line "\C-p" 'previous-line)
 ;; Always use blank lines as paragraph delimiters in motions/text objects
 (define-advice forward-evil-paragraph (:around (orig-fun &rest args))
@@ -115,7 +116,7 @@
              (set-window-prev-buffers nil prev-buffers)))))
   (advice-add #'evil-window-split :around f)
   (advice-add #'evil-window-vsplit :around f))
-(evil-define-key 'normal special-mode-map [escape] 'quit-window)
+(evil-define-key* 'normal special-mode-map [escape] 'quit-window)
 ;; Visual "*": Search for the selected text instead of the word at point
 (define-advice evil-ex-start-word-search
     (:around (oldfun unbounded direction count &optional symbol))
@@ -324,9 +325,10 @@ additional COUNT."
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
 (evil-set-initial-state 'wdired-mode 'normal)
-(evil-define-key nil dired-mode-map (kbd "SPC") nil)
+(evil-define-key nil dired-mode-map
+  (kbd "SPC") nil
+  [remap evil-next-line] 'dired-next-line [remap evil-previous-line] 'dired-previous-line)
 (evil-define-key 'normal dired-mode-map
-  "j" 'dired-next-line "k" 'dired-previous-line
   "f" 'find-file "I" 'dired-toggle-read-only)
 (evil-define-key nil wdired-mode-map
   [remap evil-write] 'wdired-finish-edit)
@@ -385,7 +387,7 @@ additional COUNT."
 ;;; Reading documentation
 (setq help-window-select t
       describe-bindings-outline t)
-(evil-define-key 'normal help-mode-map
+(evil-define-key* 'normal help-mode-map
   "\C-t" 'help-go-back
   "s" 'help-view-source)
 
@@ -431,7 +433,8 @@ mode buffer."
 (straight-use-package 'magit)
 (setq git-commit-summary-max-length 50
       git-commit-fill-column 72
-      magit-status-goto-file-position t)
+      magit-status-goto-file-position t
+      magit-diff-refine-hunk t)
 (with-eval-after-load 'transient
   (define-key transient-base-map [escape] 'transient-quit-one)
   (define-key transient-sticky-map [escape] 'transient-quit-seq))
@@ -564,9 +567,8 @@ mode buffer."
   (setq corfu-quit-at-boundary t corfu-quit-no-match t
         corfu-cycle t
         corfu-margin-formatters '(kind-margin-formatter))
-  (evil-define-key nil corfu-map
-    [escape] 'corfu-quit
-    (kbd "TAB") 'corfu-next [backtab] 'corfu-previous)
+  (evil-define-key* nil corfu-map
+    [escape] 'corfu-quit (kbd "TAB") 'corfu-next [backtab] 'corfu-previous)
   (evil-make-overriding-map corfu-map)
   (dolist (f '(corfu--setup corfu--teardown))
     (advice-add f :after #'evil-normalize-keymaps))
@@ -695,7 +697,7 @@ you would only ever cycle."
 
 (straight-use-package 'rmsbolt) ; Compiler Explorer
 
-(evil-define-key 'normal 'global
+(evil-define-key* 'normal 'global
   "\C-^" 'evil-switch-to-windows-last-buffer
   "\C-a" 'inc-at-point "\C-x" 'dec-at-point
   "U" 'undo-tree-visualize
@@ -714,12 +716,12 @@ you would only ever cycle."
     (magit-status-setup-buffer (cwd)))
   (kbd "<leader>G") 'magit-file-dispatch)
 (define-key universal-argument-map (kbd "<leader>u") 'universal-argument-more)
-(evil-define-key 'motion 'global
+(evil-define-key* 'motion 'global
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
-(evil-define-key 'visual 'global
+(evil-define-key* 'visual 'global
   "u" nil
   (kbd "g C-a") 'inc-at-point-cumulative (kbd "g C-x") 'dec-at-point-cumulative)
-(evil-define-key 'insert 'global
+(evil-define-key* 'insert 'global
   "\C-f" 'indent-according-to-mode
   ;; Continue comment on new line
   [remap newline]
