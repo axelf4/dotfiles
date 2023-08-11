@@ -66,7 +66,6 @@
  evil-ex-search-highlight-all nil ; No hlsearch
  evil-ex-substitute-case 'sensitive
  evil-toggle-key "" ; Do not map CTRL-Z
- glc-default-span 1 ; Consider only immediately adjacent changes as the same
 
  evil-undo-system 'undo-tree
  undo-tree-auto-save-history nil
@@ -94,14 +93,13 @@
         (paragraph-separate (default-value 'paragraph-separate))
         (paragraph-ignore-fill-prefix t))
     (apply orig-fun args)))
-(define-key evil-normal-state-map [remap evil-goto-last-change]
-  (evil-define-motion nil (count)
-    "Like `goto-last-change' but go to the penultimate change if already there."
-    (let ((old-pos (point)))
-      (evil-goto-last-change count)
-      (when (and (null count) (<= (abs (- old-pos (point))) glc-default-span))
-        (setq last-command this-command)
-        (goto-last-change nil)))))
+(define-key
+ evil-normal-state-map [remap evil-goto-last-change]
+ (evil-define-motion nil (count)
+   "Like `evil-goto-last-change' but go to the penultimate change if already there."
+   (let ((old-pos (point)))
+     (evil-goto-last-change (or count 1))
+     (and (null count) (= (point) old-pos) (evil-goto-last-change 1)))))
 ;; Move only vertically with gj/gk despite tracking EOL
 (defun reset-curswant (&rest _)
   "Unstick the cursor from the end of the line."
@@ -208,6 +206,105 @@ additional COUNT."
 (defun dec-at-point-cumulative (count)
   (interactive "p")
   (inc-at-point (- count) t))
+
+(defvar-local goto-chg--state nil
+  "Change list iterator for \\[evil-goto-last-change].
+Either nil or a tuple \(CACHE ALL ITER . DELTAS) where CACHE is a
+zipper \(LATER-POSS . EARLIER-POSS) of change positions already moved
+to, ALL is the sorted concatenation of LATER-POSS and EARLIER-POSS,
+ITER is the remaining tail of `buffer-undo-list', or next
+`buffer-undo-tree' node if undo-tree is enabled, and DELTAS is seen
+change digests in chronological order.")
+
+(defun goto-chg--reset (&rest _)
+  (remove-hook 'after-change-functions #'goto-chg--reset t)
+  (setq goto-chg--state nil))
+
+(evil-define-motion older-change (count)
+  "Go to COUNT older position in change list.
+Start over if changes have been made. If two changes are on the same
+line less than `fill-column' or 79 columns apart only the last one is
+considered."
+  (interactive "p")
+  (cl-destructuring-bind (cache all l . deltas)
+      (or goto-chg--state
+          (progn
+            (add-hook 'after-change-functions #'goto-chg--reset nil t)
+            (list (cons () ()) ()
+                  (if (not (bound-and-true-p undo-tree-mode))
+                      buffer-undo-list
+                    (undo-list-transfer-to-tree)
+                    (undo-tree-current buffer-undo-tree)))))
+    (cl-flet ((entry-pos (e)
+                (cond ((not (consp e)) nil)
+                      ((integerp (car e)) (1- (cdr e))) ; Insertion
+                      ((stringp (car e)) (abs (cdr e))) ; Deletion
+                      ((null (car e)) (nthcdr 4 e)) ; Textprop change
+                      ((eq (car e) 'apply) (cadddr e)))) ; Arbitrary fun
+              (=-point-p (pos)
+                (when pos
+                  (= (if (not (or (evil-normal-state-p) (evil-motion-state-p))) pos
+                       (save-excursion (goto-char pos) (evil-adjust-cursor) (point)))
+                     (point))))
+              (too-close-p (min max)
+                ;; Whether MIN/MAX are close enough that only the most
+                ;; recent one should be considered.
+                (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
+                  (save-excursion (goto-char min)
+                                  (not (search-forward "\n" max t))))))
+      (when (=-point-p (car (if (< count 0) (car cache) (cdr cache))))
+        (setq count (+ count (cl-signum count))))
+      (while (and (< count 0) (car cache))
+        (setq count (1+ count))
+        (push (goto-char (pop (car cache))) (cdr cache)))
+      (while (and (> count 0) (cdr cache))
+        (setq count (1- count))
+        (push (goto-char (pop (cdr cache))) (car cache)))
+
+      (while (and (> count 0) l)
+        (let ((list (if (bound-and-true-p undo-tree-mode) (undo-tree-node-undo l) l)))
+          ;; Find position of the most recent change in this changeset
+          (while (when list
+                   (let ((pos (entry-pos (car list))))
+                     (if (null pos) t
+                       ;; Adjust position by applying future deltas
+                       (cl-loop for (beg end . delta) in deltas when (< beg pos)
+                                do (setq pos (+ (if (< pos end) end pos) delta)))
+                       (cl-destructuring-bind (&whole tail &optional left right . _)
+                           (cl-loop for xs on all and prev = nil then xs
+                                    while (< (car xs) pos)
+                                    finally return (or prev (cons nil xs)))
+                         (unless (or (and left (too-close-p left pos))
+                                     (and right (too-close-p pos right)))
+                           (setq count (1- count))
+                           (push pos (if left (cdr tail) all))
+                           (push (goto-char pos) (car cache))))
+                       nil)))
+            (pop list))
+          ;; Collect deltas for this change
+          (while (pcase (pop list)
+                   ('nil nil) ; Undo boundary
+                   (`(,(and (pred integerp) beg) . ,end) ; Insertion
+                    (push (cons beg (cons beg (- end beg))) deltas))
+                   (`(,(and (pred stringp) text) . ,position) ; Deletion
+                    (let ((beg (abs position))
+                          (len (length text)))
+                      (push (cons beg (cons (+ beg len) (- len))) deltas)))
+                   (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
+                    (push (cons beg (cons end delta)) deltas))
+                   (_ t)))
+          (setq l (if (bound-and-true-p undo-tree-mode) (undo-tree-node-previous l) list)))))
+    (setq goto-chg--state (cons cache (cons all (cons l deltas))))
+    (unless (= count 0)
+      (error "No %s change info" (if (< count 0) "later" "further")))))
+(defalias #'evil-goto-last-change #'older-change)
+
+(evil-define-motion newer-change (count)
+  "Go to COUNT newer position in change list.
+Just like \\[evil-goto-last-change] but in the opposite direction."
+  (interactive "p")
+  (older-change (- count)))
+(defalias #'evil-goto-last-change-reverse #'newer-change)
 
 (defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
