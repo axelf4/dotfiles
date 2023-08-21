@@ -483,7 +483,7 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
 
 ;;; Reading documentation
 (setq help-window-select t
-      describe-bindings-outline t)
+      help-window-keep-selected t)
 (evil-define-key* 'normal help-mode-map
   "\C-t" 'help-go-back
   "s" 'help-view-source)
@@ -530,6 +530,7 @@ mode buffer."
 (straight-use-package 'magit)
 (setq git-commit-summary-max-length 50
       git-commit-fill-column 72
+      magit-define-global-key-bindings nil
       magit-status-goto-file-position t
       magit-diff-refine-hunk t)
 (with-eval-after-load 'transient
@@ -573,24 +574,10 @@ mode buffer."
   "+" 'magit-diff-more-context "-" 'magit-diff-less-context)
 
 (with-eval-after-load 'smerge-mode
-  (require 'transient)
-  (transient-define-prefix smerge-dispatch ()
-    "Invoke an SMerge command from a list of available commands."
-    [["Keep"
-      ("b" "Base" smerge-keep-base)
-      ("u" "Upper" smerge-keep-upper)
-      ("l" "Lower" smerge-keep-lower)
-      ("a" "All" smerge-keep-all) ("RET" "Current" smerge-keep-current)]
-     ["Diff"
-      ("<" "Base/upper" smerge-diff-base-upper)
-      ("=" "Upper/lower" smerge-diff-upper-lower)
-      (">" "Base/lower" smerge-diff-base-lower)
-      ("R" "Refine" smerge-refine :transient t)]
-     ["Other"
-      ("C" "Combine" smerge-combine-with-next)
-      ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
-  (define-key (plist-get smerge-text-properties 'keymap) (kbd "RET")
-    `(menu-item "" smerge-dispatch :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd)))))
+  (define-key
+   (plist-get smerge-text-properties 'keymap) (kbd "RET")
+   `(menu-item "" ,smerge-basic-map :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd))))
+  (define-key smerge-basic-map (kbd "RET") 'smerge-keep-current))
 (evil-define-motion evil-forward-conflict (count)
   "Move the cursor to the beginning of the COUNT-th next conflict."
   :jump t
@@ -906,7 +893,7 @@ Works with: statement, statement-cont."
                                  erlang-electric-gt
                                  erlang-electric-newline))
 (add-hook 'erlang-mode-hook
-          (lambda () (setq electric-indent-words '("end"))))
+          (lambda () (setq electric-indent-words '("end" "after"))))
 
 ;; Lazily lookup path to Agda mode
 (push '("\\.l?agda\\'" .
