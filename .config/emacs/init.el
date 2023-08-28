@@ -84,7 +84,7 @@
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
 
 ;; Inherit command-line mappings in minibuffers
-(set-keymap-parent minibuffer-local-map evil-ex-completion-map)
+(set-keymap-parent minibuffer-local-map evil-command-line-map)
 (evil-define-key* nil minibuffer-local-map ; but undo remappings...
   "\C-n" 'next-line "\C-p" 'previous-line)
 ;; Always use blank lines as paragraph delimiters in motions/text objects
@@ -371,15 +371,15 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
       read-buffer-completion-ignore-case t
       read-extended-command-predicate #'command-completion-default-include-p
       completion-styles '(hotfuzz)
-      completion-category-defaults nil)
+      completion-category-defaults ()
+      completion-category-overrides `((eglot (styles . ,completion-styles))))
 (vertico-mode)
 (hotfuzz-vertico-mode)
 
 (defun minibuffer-completion-in-region (start end collection &optional predicate)
   "Read from minibuffer to complete text between START and END using COLLECTION."
-  (if-let ((completion
-            (completing-read "Completion: " collection predicate nil
-                             (buffer-substring-no-properties start end))))
+  (if-let (completion (completing-read "Completion: " collection predicate nil
+                                       (buffer-substring-no-properties start end)))
       (let ((minibuffer-completion-table collection)
             (minibuffer-completion-predicate predicate))
         (completion--replace
@@ -733,6 +733,11 @@ you would only ever cycle."
         (completion-at-point)
       (let ((tab-always-indent 'complete) transient-mark-mode)
         (indent-for-tab-command arg)))))
+;; Insert completion without overwriting text right of cursor
+(define-advice completion--capf-wrapper (:filter-return (res))
+  (and (consp (cdr-safe res)) (not (functionp (cdr res)))
+       (setcar (nthcdr 2 res) (point))) ; Set `end' to point
+  res)
 
 (defun file-completion-at-point (&optional interactive)
   "Complete file name at point."
@@ -751,25 +756,9 @@ you would only ever cycle."
          (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
 
 ;;; Language server protocol
-(straight-use-package 'lsp-mode)
-(setq lsp-keymap-prefix "<leader> l"
-      lsp-enable-symbol-highlighting nil
-      lsp-enable-text-document-color nil
-      lsp-enable-folding nil
-      lsp-auto-execute-action nil
-      lsp-enable-suggest-server-download nil
-      lsp-completion-default-behaviour :insert
-      lsp-rust-analyzer-server-display-inlay-hints t)
-(with-eval-after-load 'lsp-mode
-  (add-hook
-   'prog-mode-hook
-   (lambda ()
-     "Start lsp mode if the current buffer is part of a session."
-     (and buffer-file-name
-          (lsp-find-session-folder (lsp-session) buffer-file-name)
-          (lsp--filter-clients (-andfn #'lsp--supports-buffer?
-                                       #'lsp--server-binary-present?))
-          (lsp)))))
+(setq eglot-extend-to-xref t
+      eglot-ignored-server-capabilities '(:documentHighlightProvider))
+(advice-add #'eglot--current-project :around #'with-cwd)
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
