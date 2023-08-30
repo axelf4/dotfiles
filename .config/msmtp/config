@@ -4,9 +4,10 @@ tls
 
 account axelf.se
 host smtp.sendgrid.net
-tls_starttls off
 from axel@axelf.se
 user apikey
-passwordeval "kwallet-query --read-password msmtp/sendgrid kdewallet"
+# Redirect the "queue ... destroyed while proxies still attached: ..."
+# warning as the Sendmail Emacs package interprets it as an error.
+passwordeval "kwallet-query --read-password msmtp/sendgrid kdewallet 2>&1"
 
 account default : axelf.se

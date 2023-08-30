@@ -3,9 +3,12 @@ path=.mail
 
 [new]
 tags=new
+# Ignore mbsync files
+ignore=.uidvalidity;.mbsyncstate
 
 [search]
 exclude_tags=deleted;spam
 
 [index]
-header.List=List-Id # Index the List-Id header as List: prefix
+# Index the List-Id header as List: prefix
+header.List=List-Id
