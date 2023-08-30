@@ -75,10 +75,10 @@
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
- evil-motion-state-modes ()
  evil-mode-line-format nil
- ;; Default fails to mimic Vim by not wrapping before looking in other buffers
- evil-complete-next-func #'dabbrev-expand)
+ evil-insert-state-modes '(comint-mode erc-mode)
+ evil-motion-state-modes ()
+ evil-emacs-state-modes '(debugger-mode))
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
 (add-hook 'evil-local-mode-hook #'undo-tree-mode)
@@ -247,8 +247,6 @@ considered."
                        (save-excursion (goto-char pos) (evil-adjust-cursor) (point)))
                      (point))))
               (too-close-p (min max)
-                ;; Whether MIN/MAX are close enough that only the most
-                ;; recent one should be considered.
                 (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
                   (save-excursion (goto-char min)
                                   (not (search-forward "\n" max t))))))
@@ -421,7 +419,6 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
       dired-recursive-copies 'always dired-recursive-deletes 'always
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
-(evil-set-initial-state 'wdired-mode 'normal)
 (evil-define-key nil dired-mode-map
   (kbd "SPC") nil
   [remap evil-next-line] 'dired-next-line [remap evil-previous-line] 'dired-previous-line)
@@ -536,16 +533,6 @@ mode buffer."
 (with-eval-after-load 'transient
   (define-key transient-base-map [escape] 'transient-quit-one)
   (define-key transient-sticky-map [escape] 'transient-quit-seq))
-(dolist (mode '(git-rebase-mode
-                magit-status-mode
-                magit-log-mode
-                magit-log-select-mode
-                magit-revision-mode
-                magit-diff-mode
-                magit-process-mode
-                magit-stash-mode
-                magit-stashes-mode))
-  (evil-set-initial-state mode 'normal))
 (with-eval-after-load 'git-rebase
   ;; Edit rebase sequences as ordinary text
   (add-hook 'git-rebase-mode-hook (lambda () (setq buffer-read-only nil)))
@@ -796,13 +783,14 @@ you would only ever cycle."
   (kbd "g C-a") 'inc-at-point-cumulative (kbd "g C-x") 'dec-at-point-cumulative)
 (evil-define-key* 'insert 'global
   "\C-f" 'indent-according-to-mode
+  "\C-n" 'dabbrev-expand
   ;; Continue comment on new line
   [remap newline]
-  '(menu-item "" default-indent-new-line :filter
-              (lambda (_cmd)
-                (when (save-excursion (comment-beginning))
-                  `(lambda () (interactive) (,comment-line-break-function)))))
-  (kbd "C-x C-f") 'file-completion-at-point)
+  `(menu-item "" default-indent-new-line :filter
+              ,(lambda (_cmd)
+                 (when (save-excursion (comment-beginning))
+                   `(lambda () (interactive) (,comment-line-break-function)))))
+  "\C-x\C-f" 'file-completion-at-point)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
