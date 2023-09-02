@@ -755,6 +755,66 @@ you would only ever cycle."
   (define-key flyspell-mouse-map (kbd "RET")
     `(menu-item "" ispell-word :filter ,(lambda (cmd) (when (evil-normal-state-p) cmd)))))
 
+;;; Email
+(setq send-mail-function #'sendmail-send-it ; Use external "sendmail" program
+      message-kill-buffer-on-exit t
+      message-default-mail-headers "Cc: \nBcc: \n"
+      message-directory "~/.mail/"
+      notmuch-search-oldest-first nil
+      notmuch-search-result-format
+      `(("date" . "%-12s ") ("authors" . "%-20s ") ("subject" . "%s ")
+        (,(cl-function
+           (lambda (_format-string (&key matched total &allow-other-keys))
+             (format (cond ((= total 1) "")
+                           ((< matched total) #("%d/%d " 0 5 (face notmuch-search-count)))
+                           (t #("%2$d " 0 4 (face notmuch-search-count))))
+                     matched total))))
+        ("tags" . "%s"))
+      notmuch-fcc-dirs '(("axel@axelf.se" . "\"gmail/[Gmail]/Sent Mail\" +sent")))
+(with-eval-after-load 'notmuch
+  (defun notmuch-delete (&optional undelete)
+    "Delete each message in the currently selected thread.
+If a prefix argument is given, the messages will be \"undeleted\"."
+    (interactive "P")
+    (funcall (cl-ecase major-mode
+               (notmuch-search-mode #'notmuch-search-tag)
+               (notmuch-show-mode #'notmuch-show-tag-all))
+             (list (concat (if undelete "-" "+") "deleted"))))
+  (defun notmuch-mua-subject-check ()
+    "Signal an error if the message subject is missing."
+    (unless (message-field-value "Subject")
+      (message-goto-subject)
+      (error "Missing subject")))
+  (defun notmuch-show-close-read-messages ()
+    "Collapse all non-unread messages."
+    (goto-char (point-min))
+    (while (let ((props (get-text-property (point) :notmuch-message-properties)))
+             (unless (member "unread" (plist-get props :tags))
+               (notmuch-show-message-visible props nil))
+             (notmuch-show-goto-message-next))))
+  (add-hook 'notmuch-mua-send-hook #'notmuch-mua-attachment-check)
+  (add-hook 'notmuch-mua-send-hook #'notmuch-mua-subject-check)
+  (add-hook 'notmuch-show-hook #'notmuch-show-close-read-messages)
+  (evil-define-key* 'normal notmuch-common-keymap
+    [escape] 'notmuch-bury-or-kill-this-buffer "g?" 'notmuch-help
+    "s" 'notmuch-search "S" 'notmuch-tree
+    "c" 'notmuch-mua-new-mail "x" 'notmuch-delete
+    "gr" 'notmuch-refresh-this-buffer "gR" 'notmuch-poll-and-refresh-this-buffer)
+  (evil-define-key* 'normal notmuch-search-mode-map
+    (kbd "RET") 'notmuch-search-show-thread
+    "A" 'notmuch-search-archive-thread
+    "-" 'notmuch-search-remove-tag "+" 'notmuch-search-add-tag)
+  (evil-define-key* 'normal notmuch-show-mode-map
+    (kbd "RET") 'notmuch-show-toggle-message
+    "[[" 'notmuch-show-previous-message "]]" 'notmuch-show-next-message
+    "." 'notmuch-show-part-map "A" 'notmuch-show-archive-thread-then-exit
+    "r" 'notmuch-show-reply "R" 'notmuch-show-reply-sender
+    "-" 'notmuch-show-remove-tag "+" 'notmuch-show-add-tag)
+  (evil-define-key* 'normal notmuch-tree-mode-map
+    (kbd "RET") 'notmuch-tree-show-message))
+;; Autoloads for Nixpkgs packages are not loaded without package.el
+(autoload 'notmuch-jump-search "notmuch")
+
 (straight-use-package 'rmsbolt) ; Compiler Explorer
 
 (evil-define-key* 'normal 'global
@@ -774,7 +834,8 @@ you would only ever cycle."
     "Run `magit-status' in the root of the current project."
     (interactive)
     (magit-status-setup-buffer (cwd)))
-  (kbd "<leader>G") 'magit-file-dispatch)
+  (kbd "<leader>G") 'magit-file-dispatch
+  (kbd "<leader>m") 'notmuch-jump-search)
 (define-key universal-argument-map (kbd "<leader>u") 'universal-argument-more)
 (evil-define-key* 'motion 'global
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
