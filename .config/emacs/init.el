@@ -41,8 +41,7 @@
 
 (electric-pair-mode) ; Autopairing
 ;; Inhibit autopairing in minibuffers
-(add-hook 'minibuffer-setup-hook
-          (lambda () (setq-local electric-pair-inhibit-predicate #'always)))
+(add-hook 'minibuffer-setup-hook (lambda () (electric-pair-local-mode 0)))
 
 (defvar-local electric-indent-words ()
   "Words that should cause automatic reindentation.")
@@ -99,6 +98,7 @@
    "Like `evil-goto-last-change' but go to the penultimate change if already there."
    (let ((old-pos (point)))
      (evil-goto-last-change (or count 1))
+     (when (or (evil-normal-state-p) (evil-motion-state-p)) (evil-adjust-cursor))
      (and (null count) (= (point) old-pos) (evil-goto-last-change 1)))))
 ;; Move only vertically with gj/gk despite tracking EOL
 (defun reset-curswant (&rest _)
@@ -228,73 +228,57 @@ considered."
   (interactive "p")
   (cl-destructuring-bind (cache all l . deltas)
       (or goto-chg--state
-          (progn
-            (add-hook 'after-change-functions #'goto-chg--reset nil t)
-            (list (cons () ()) ()
-                  (if (not (bound-and-true-p undo-tree-mode))
-                      buffer-undo-list
-                    (undo-list-transfer-to-tree)
-                    (undo-tree-current buffer-undo-tree)))))
-    (cl-flet ((entry-pos (e)
-                (cond ((not (consp e)) nil)
-                      ((integerp (car e)) (1- (cdr e))) ; Insertion
-                      ((stringp (car e)) (abs (cdr e))) ; Deletion
-                      ((null (car e)) (nthcdr 4 e)) ; Textprop change
-                      ((eq (car e) 'apply) (cadddr e)))) ; Arbitrary fun
-              (=-point-p (pos)
-                (when pos
-                  (= (if (not (or (evil-normal-state-p) (evil-motion-state-p))) pos
-                       (save-excursion (goto-char pos) (evil-adjust-cursor) (point)))
-                     (point))))
-              (too-close-p (min max)
-                (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
-                  (save-excursion (goto-char min)
-                                  (not (search-forward "\n" max t))))))
-      (when (=-point-p (car (if (< count 0) (car cache) (cdr cache))))
-        (setq count (+ count (cl-signum count))))
-      (while (and (< count 0) (car cache))
-        (setq count (1+ count))
-        (push (goto-char (pop (car cache))) (cdr cache)))
-      (while (and (> count 0) (cdr cache))
-        (setq count (1- count))
-        (push (goto-char (pop (cdr cache))) (car cache)))
-
-      (while (and (> count 0) l)
-        (let ((list (if (bound-and-true-p undo-tree-mode) (undo-tree-node-undo l) l)))
-          ;; Find position of the most recent change in this changeset
-          (while (when list
-                   (let ((pos (entry-pos (car list))))
-                     (if (null pos) t
-                       ;; Adjust position by applying future deltas
-                       (cl-loop for (beg end . delta) in deltas when (< beg pos)
-                                do (setq pos (+ (if (< pos end) end pos) delta)))
-                       (cl-destructuring-bind (&whole tail &optional left right . _)
-                           (cl-loop for xs on all and prev = nil then xs
-                                    while (< (car xs) pos)
-                                    finally return (or prev (cons nil xs)))
-                         (unless (or (and left (too-close-p left pos))
-                                     (and right (too-close-p pos right)))
-                           (setq count (1- count))
-                           (push pos (if left (cdr tail) all))
-                           (push (goto-char pos) (car cache))))
-                       nil)))
-            (pop list))
-          ;; Collect deltas for this change
-          (while (pcase (pop list)
-                   ('nil nil) ; Undo boundary
-                   (`(,(and (pred integerp) beg) . ,end) ; Insertion
-                    (push (cons beg (cons beg (- end beg))) deltas))
-                   (`(,(and (pred stringp) text) . ,position) ; Deletion
-                    (let ((beg (abs position))
-                          (len (length text)))
-                      (push (cons beg (cons (+ beg len) (- len))) deltas)))
-                   (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
-                    (push (cons beg (cons end delta)) deltas))
-                   (_ t)))
-          (setq l (if (bound-and-true-p undo-tree-mode) (undo-tree-node-previous l) list)))))
-    (setq goto-chg--state (cons cache (cons all (cons l deltas))))
-    (unless (= count 0)
-      (error "No %s change info" (if (< count 0) "later" "further")))))
+          (progn (add-hook 'after-change-functions #'goto-chg--reset nil t)
+                 (list (cons () ()) ()
+                       (if (not (bound-and-true-p undo-tree-mode)) buffer-undo-list
+                         (undo-list-transfer-to-tree)
+                         (undo-tree-current buffer-undo-tree)))))
+    (when-let ((p (car (if (< count 0) (car cache) (cdr cache))))
+               ((= (if (not (or (evil-normal-state-p) (evil-motion-state-p))) p
+                     (save-excursion (goto-char p) (evil-adjust-cursor) (point)))
+                   (point))))
+      (setq count (+ count (cl-signum count))))
+    (while (and (< count 0) (car cache))
+      (setq count (1+ count)) (push (goto-char (pop (car cache))) (cdr cache)))
+    (while (and (> count 0) (cdr cache))
+      (setq count (1- count)) (push (goto-char (pop (cdr cache))) (car cache)))
+    (while (and (> count 0) l)
+      (let ((list (if (bound-and-true-p undo-tree-mode) (undo-tree-node-undo l) l))
+            (old-deltas deltas) pos)
+        ;; Collect deltas and position of most recent change in this changeset
+        (while (pcase (pop list)
+                 ('nil nil) ; Undo boundary
+                 (`(,(and (pred integerp) beg) . ,end) ; Insertion
+                  (unless pos (setq pos (1- end)))
+                  (push (cons beg (cons beg (- end beg))) deltas))
+                 (`(,(and (pred stringp) text) . ,position) ; Deletion
+                  (let ((beg (abs position)) (len (length text)))
+                    (unless pos (setq pos beg))
+                    (push (cons beg (cons (+ beg len) (- len))) deltas)))
+                 (`(nil ,_property ,_value ,_beg . ,end) ; Textprop change
+                  (if pos t (setq pos end)))
+                 (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
+                  (unless pos (setq pos end))
+                  (push (cons beg (cons end delta)) deltas))
+                 (_ t)))
+        (when pos
+          ;; Adjust position by applying future deltas
+          (cl-loop for (beg end . delta) in old-deltas when (< beg pos)
+                   do (setq pos (+ (if (< pos end) end pos) delta)))
+          (cl-destructuring-bind (&whole tail &optional left right . _)
+              (cl-loop for xs on all and prev = nil then xs while (< (car xs) pos)
+                       finally return (or prev (cons nil xs)))
+            (cl-flet ((too-close-p (min max)
+                        (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
+                          (save-excursion (goto-char min) (not (search-forward "\n" max t))))))
+              (unless (or (and left (too-close-p left pos))
+                          (and right (too-close-p pos right)))
+                (setq count (1- count))
+                (push pos (if left (cdr tail) all))
+                (push (goto-char pos) (car cache))))))
+        (setq l (if (bound-and-true-p undo-tree-mode) (undo-tree-node-previous l) list))))
+    (setq goto-chg--state (cons cache (cons all (cons l deltas)))))
+  (or (= count 0) (error "No %s change info" (if (< count 0) "later" "further"))))
 (defalias #'evil-goto-last-change #'older-change)
 
 (evil-define-motion newer-change (count)
@@ -746,6 +730,7 @@ you would only ever cycle."
 (setq eglot-extend-to-xref t
       eglot-ignored-server-capabilities '(:documentHighlightProvider))
 (advice-add #'eglot--current-project :around #'with-cwd)
+(advice-add #'jsonrpc--log-event :override #'ignore)
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
