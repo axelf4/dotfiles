@@ -4,7 +4,7 @@
 (load (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory)
       nil 'nomessage)
 
-(setq gc-cons-threshold 16777216
+(setq gc-cons-threshold #x1000000
       native-comp-async-report-warnings-errors 'silent
       enable-recursive-minibuffers t
       translate-upper-case-key-bindings nil
@@ -21,8 +21,9 @@
       tags-revert-without-query t
       tags-add-tables t
       xref-auto-jump-to-first-xref t
+      undo-auto-current-boundary-timer t ; Disable automatic undo boundaries
       show-paren-predicate t ; Enable Show Paren Mode in special buffers too
-      vc-handled-backends nil ; Disable VC
+      vc-handled-backends () ; Disable VC
       comment-multi-line t
       sentence-end-double-space nil ; Single space between sentences
       calendar-week-start-day 1 ; Monday as first day of the week
@@ -826,7 +827,7 @@ If a prefix argument is given, the messages will be \"undeleted\"."
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
 (evil-define-key* 'visual 'global
   "u" nil
-  (kbd "g C-a") 'inc-at-point-cumulative (kbd "g C-x") 'dec-at-point-cumulative)
+  "g\C-a" 'inc-at-point-cumulative "g\C-x" 'dec-at-point-cumulative)
 (evil-define-key* 'insert 'global
   "\C-f" 'indent-according-to-mode
   "\C-n" 'dabbrev-expand
