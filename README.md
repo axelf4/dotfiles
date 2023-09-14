@@ -1,3 +1,7 @@
+<div align="center">
+	<img alt="logo" src="../extra/logo.svg" height="280">
+</div>
+
 # dotfiles
 
 ## Installation
