@@ -181,8 +181,7 @@ additional COUNT."
           (when (<= ?0 (char-after) ?9)
             (skip-chars-backward "0-9")
             (when (eq (char-before) ?-) (backward-char))))))
-    (unless (search-forward-inc count (line-end-position))
-      (user-error "No number here"))
+    (or (search-forward-inc count (line-end-position)) (error "No number here"))
     (backward-char))
    ((eq (evil-visual-type) 'block)
     (evil-apply-on-block
@@ -300,11 +299,11 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
       (narrow-to-region
        (progn (goto-char beg) (or (comment-beginning) beg))
        (progn (goto-char (max (1- end) beg))
-              (end-of-line (when (<= (line-beginning-position) beg) 2)) (point)))
+              (end-of-line (when (<= (pos-bol) beg) 2)) (point)))
       (insert ?\n)
       (goto-char (point-min))
       (while (setq spt (comment-search-forward (point-max) t))
-        (let ((npt (line-beginning-position 2)) (iept (point-max)))
+        (let ((npt (pos-bol 2)) (iept (point-max)))
           (if (when (progn (goto-char spt) (comment-forward))
                 (setq iept (save-excursion (comment-enter-backward) (point)))
                 (= (point) npt)) ; Line comments include NL
@@ -697,10 +696,9 @@ mode buffer."
 (define-key global-map [remap indent-for-tab-command]
   (lambda (arg)
     "Perform symbol completion and/or indent if in the left margin.
-Differs from having `tab-always-indent' set to `complete' in that it
-always tries to complete if point is right of the left margin.
-Otherwise in programming language modes that do TAB cycle indentation
-you would only ever cycle."
+Differs from having `tab-always-indent' set to `complete' by always
+completing if point is right of the left margin. Otherwise, completion
+would never be attempted in case of TAB cycle indentation."
     (interactive "P")
     (setq this-command 'indent-for-tab-command)
     (if (> (current-column) (current-indentation))
@@ -723,8 +721,7 @@ you would only ever cycle."
     (ffap-string-at-point)
     `(,@ffap-string-at-point-region completion-file-name-table
       :predicate ,(lambda (s) (not (string= s "./"))) :exclusive no
-      :company-kind
-      ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
+      :company-kind ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
       :exit-function ; Continue completing descendants of directory
       ,(lambda (s _status)
          (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
