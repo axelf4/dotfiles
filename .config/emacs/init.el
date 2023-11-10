@@ -23,6 +23,7 @@
       xref-auto-jump-to-first-xref t
       undo-auto-current-boundary-timer t ; Disable automatic undo boundaries
       show-paren-predicate t ; Enable Show Paren Mode in special buffers too
+      long-line-threshold nil
       vc-handled-backends () ; Disable VC
       comment-multi-line t
       sentence-end-double-space nil ; Single space between sentences
@@ -155,7 +156,7 @@ and return non-nil."
                ((eq base 8) (format "%o" num))
                ((eq base 10) (number-to-string num))
                ((eq base 16) (format "%x" num)))
-         fixedcase fixedcase nil subexp))
+         fixedcase t nil subexp))
       t)))
 
 (defun inc-at-point (count &optional cumulative)
@@ -346,8 +347,8 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
   (xclip-mode))
 
 ;;; Minibuffer completion
-(straight-use-package 'vertico)
 (straight-use-package 'hotfuzz)
+(straight-use-package 'vertico)
 (setq completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
@@ -356,7 +357,6 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
       completion-category-defaults ()
       completion-category-overrides `((eglot (styles . ,completion-styles))))
 (vertico-mode)
-(hotfuzz-vertico-mode)
 
 (defun minibuffer-completion-in-region (start end collection &optional predicate)
   "Read from minibuffer to complete text between START and END using COLLECTION."
@@ -720,7 +720,7 @@ would never be attempted in case of TAB cycle indentation."
     (require 'ffap)
     (ffap-string-at-point)
     `(,@ffap-string-at-point-region completion-file-name-table
-      :predicate ,(lambda (s) (not (string= s "./"))) :exclusive no
+      :predicate ,(lambda (s) (not (string= s "./")))
       :company-kind ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
       :exit-function ; Continue completing descendants of directory
       ,(lambda (s _status)
