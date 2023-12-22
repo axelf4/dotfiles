@@ -25,9 +25,9 @@
       show-paren-predicate t ; Enable Show Paren Mode in special buffers too
       long-line-threshold nil
       vc-handled-backends () ; Disable VC
-      comment-multi-line t
       sentence-end-double-space nil ; Single space between sentences
       calendar-week-start-day 1 ; Monday as first day of the week
+      calendar-date-style 'european ; Write dates as day/month/year
       ;; Tailor dynamic abbrevs for non-text modes by default
       dabbrev-upcase-means-case-search t
       dabbrev-case-replace nil
@@ -77,7 +77,7 @@
  evil-symbol-word-search t
  evil-split-window-below t evil-vsplit-window-right t
  evil-mode-line-format nil
- evil-insert-state-modes '(comint-mode erc-mode)
+ evil-insert-state-modes '(comint-mode)
  evil-motion-state-modes ()
  evil-emacs-state-modes '(debugger-mode))
 (evil-mode)
@@ -909,6 +909,7 @@ Works with: statement, statement-cont."
           (lambda () (setq electric-indent-words '("else"))))
 
 (straight-use-package 'lua-mode)
+(setq lua-indent-level 4)
 (add-hook 'lua-mode-hook
           (lambda () (setq electric-indent-words '("end" "else"))))
 
