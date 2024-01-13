@@ -2,9 +2,9 @@
 
 notmuch tag --batch <<-EOF
 	# Sync mail deleted/archived from far side
-	-inbox tag:new tag:inbox not folder:gmail/INBOX
+	-inbox tag:inbox not folder:gmail/INBOX
 	+inbox tag:new folder:gmail/INBOX
-	+deleted tag:new folder:gmail/[Gmail]/Trash
+	+deleted folder:gmail/[Gmail]/Trash
 	+sent tag:new folder:"gmail/[Gmail]/Sent Mail"
 
 	+emacs-devel -inbox tag:new List:emacs-devel.gnu.org
