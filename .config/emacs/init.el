@@ -406,13 +406,12 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
 
 (defun sudo-file-name (file)
   "Return TRAMP file name for editing FILE as root with sudo."
-  (let ((remote-id (copy-sequence (file-remote-p file))))
-    (concat
-     (if remote-id
-         (progn (aset remote-id (1- (length remote-id)) ?|) ; Replace :
-                remote-id)
-       "/")
-     "sudo::" (or (file-remote-p file 'localname) file))))
+  (concat
+   (if-let (remote-id (copy-sequence (file-remote-p file)))
+       (progn (aset remote-id (1- (length remote-id)) ?|) ; Replace :
+              remote-id)
+     "/")
+   "sudo::" (or (file-remote-p file 'localname) file)))
 
 (with-eval-after-load 'grep
   (setq grep-save-buffers nil)
@@ -604,7 +603,7 @@ mode buffer."
            (keyword "k" . font-lock-keyword-face)
            (snippet "S" . font-lock-string-face))))
     (defun kind-margin-formatter (_metadata)
-      (when-let ((kind-fun (plist-get completion-extra-properties :company-kind)))
+      (when-let (kind-fun (plist-get completion-extra-properties :company-kind))
         (lambda (s)
           (if-let (x (alist-get (funcall kind-fun s) kind-text-mapping))
               (let ((s (format " %s " (car x)))
@@ -618,10 +617,11 @@ mode buffer."
   (evil-define-key* nil corfu-map
     [escape] 'corfu-quit (kbd "TAB") 'corfu-next [backtab] 'corfu-previous)
   (evil-make-overriding-map corfu-map)
-  (dolist (f '(corfu--setup corfu--teardown))
-    (advice-add f :after #'evil-normalize-keymaps))
+  (define-advice corfu--setup (:after (&rest _)) (evil-normalize-keymaps))
+  (define-advice corfu--teardown (:after (buf))
+    (when (buffer-live-p buf) (with-current-buffer buf (evil-normalize-keymaps))))
 
-  (defvar-local corfu-terminal--ov nil)
+  (defvar corfu-terminal--ov nil)
   (cl-defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar &aux save-pos buffer)
     "Show the Corfu `corfu--popup-show' completion popup using overlays."
     (when corfu-terminal--ov (delete-overlay corfu-terminal--ov))
