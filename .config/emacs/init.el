@@ -45,14 +45,13 @@
 ;; Inhibit autopairing in minibuffers
 (add-hook 'minibuffer-setup-hook (lambda () (electric-pair-local-mode 0)))
 
-(defvar-local electric-indent-words ()
-  "Words that should cause automatic reindentation.")
+(defvar-local electric-indent-regexp nil
+  "Regular expression that should cause automatic reindentation.")
 (add-hook
  'electric-indent-functions
  (lambda (_ch)
-   (save-excursion
-     (backward-word)
-     (looking-at-p (regexp-opt electric-indent-words)))))
+   (when electric-indent-regexp
+     (save-excursion (backward-word) (looking-at-p electric-indent-regexp)))))
 
 ;;; vi emulation
 (straight-use-package 'evil)
@@ -198,15 +197,9 @@ additional COUNT."
           (when cumulative (setq amount (+ amount count)))
           (forward-line)))
       (goto-char evil-visual-beginning))))
-(defun dec-at-point (count)
-  (interactive "p")
-  (inc-at-point (- count)))
-(defun inc-at-point-cumulative (count)
-  (interactive "p")
-  (inc-at-point count t))
-(defun dec-at-point-cumulative (count)
-  (interactive "p")
-  (inc-at-point (- count) t))
+(defun dec-at-point (count) (interactive "p") (inc-at-point (- count)))
+(defun inc-at-point-cumulative (count) (interactive "p") (inc-at-point count t))
+(defun dec-at-point-cumulative (count) (interactive "p") (inc-at-point (- count) t))
 
 (defvar-local goto-chg--state nil
   "Change list iterator for \\[evil-goto-last-change].
@@ -719,7 +712,8 @@ would never be attempted in case of TAB cycle indentation."
         (completion-at-point))
     (require 'ffap)
     (ffap-string-at-point)
-    `(,@ffap-string-at-point-region completion-file-name-table
+    `(,@ffap-string-at-point-region
+      completion-file-name-table
       :predicate ,(lambda (s) (not (string= s "./")))
       :company-kind ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
       :exit-function ; Continue completing descendants of directory
@@ -810,6 +804,7 @@ If a prefix argument is given, the messages will be \"undeleted\"."
   [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
   (kbd "<leader>h") 'help-command
+  (kbd "<leader>w") 'evil-window-map
   (kbd "<leader>b") 'switch-to-buffer
   (kbd "<leader>f") 'find-file-rec (kbd "<leader>F") 'dired-jump
   (kbd "<leader>e") 'pp-eval-last-sexp (kbd "<leader>E") 'eval-defun
@@ -881,7 +876,7 @@ Works with: statement, statement-cont."
           (lambda () (setq indent-tabs-mode nil)))
 
 (add-hook 'sh-mode-hook
-          (lambda () (setq electric-indent-words '("fi" "else" "done" "esac"))))
+          (lambda () (setq electric-indent-regexp "fi\\|else\\|done\\|esac")))
 
 (straight-use-package 'markdown-mode)
 (setq markdown-indent-on-enter 'indent-and-new-item)
@@ -906,18 +901,18 @@ Works with: statement, statement-cont."
 
 (straight-use-package 'nix-mode)
 (add-hook 'nix-mode-hook
-          (lambda () (setq electric-indent-words '("else"))))
+          (lambda () (setq electric-indent-regexp "else")))
 
 (straight-use-package 'lua-mode)
 (setq lua-indent-level 4)
 (add-hook 'lua-mode-hook
-          (lambda () (setq electric-indent-words '("end" "else"))))
+          (lambda () (setq electric-indent-regexp "end\\|else\\|until")))
 
 (setq erlang-electric-commands '(erlang-electric-semicolon
                                  erlang-electric-gt
                                  erlang-electric-newline))
 (add-hook 'erlang-mode-hook
-          (lambda () (setq electric-indent-words '("end" "after"))))
+          (lambda () (setq electric-indent-regexp "end\\|after")))
 
 ;; Lazily lookup path to Agda mode
 (push '("\\.l?agda\\'" .
