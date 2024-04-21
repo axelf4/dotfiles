@@ -53,6 +53,28 @@
    (when electric-indent-regexp
      (save-excursion (backward-word) (looking-at-p electric-indent-regexp)))))
 
+;;; System clipboard support when running in terminal
+(when-let (backend (or (when (executable-find "wl-copy") 'wl-clipboard)
+                       (when (executable-find "xclip") 'xclip)))
+  (cl-defmethod gui-backend-get-selection
+    (selection-symbol target-type &context (window-system nil))
+    (with-output-to-string
+      (cl-case backend
+        (wl-clipboard
+         (apply #'call-process "wl-paste" nil standard-output nil
+                "--no-newline" (when (eq selection-symbol 'PRIMARY) '("--primary"))))
+        (xclip (call-process "xclip" nil standard-output nil
+                             "-out" "-selection" (symbol-name selection-symbol))))))
+  (cl-defmethod gui-backend-set-selection (selection value &context (window-system nil))
+    (let* ((cmd (cl-case backend
+                  (wl-clipboard
+                   `("wl-copy" ,@(when (eq selection 'PRIMARY) '("--primary"))))
+                  (xclip `("xclip" "-selection" (symbol-name selection)))))
+           process-connection-type
+           (proc (make-process :name "set-selection" :command cmd)))
+      (process-send-string proc value)
+      (process-send-eof proc))))
+
 ;;; vi emulation
 (straight-use-package 'evil)
 (straight-use-package 'undo-tree)
@@ -334,11 +356,6 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
 
 (evil-define-key 'normal xref--xref-buffer-mode-map (kbd "RET") 'xref-goto-xref)
 
-;; System clipboard support while running in terminal
-(straight-use-package 'xclip)
-(ignore-error file-error ; Silence missing backend error
-  (xclip-mode))
-
 ;;; Minibuffer completion
 (straight-use-package 'hotfuzz)
 (straight-use-package 'vertico)
@@ -397,8 +414,7 @@ Just like \\[evil-goto-last-change] but in the opposite direction."
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
 (evil-define-key nil dired-mode-map
-  (kbd "SPC") nil
-  [remap evil-next-line] 'dired-next-line [remap evil-previous-line] 'dired-previous-line)
+  (kbd "SPC") nil)
 (evil-define-key 'normal dired-mode-map
   "f" 'find-file "I" 'dired-toggle-read-only)
 (evil-define-key nil wdired-mode-map
