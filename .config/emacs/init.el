@@ -77,7 +77,6 @@
 
 ;;; vi emulation
 (straight-use-package 'evil)
-(straight-use-package 'undo-tree)
 (setq
  ;; Behave more like Vim
  evil-want-C-u-scroll t
@@ -89,9 +88,7 @@
  evil-ex-substitute-case 'sensitive
  evil-toggle-key "" ; Do not map CTRL-Z
 
- evil-undo-system 'undo-tree
- undo-tree-auto-save-history nil
- undo-tree-enable-undo-in-region t
+ evil-undo-system 'undo-redo
  evil-ex-complete-emacs-commands t
  evil-ex-visual-char-range t ; Evil has characterwise ranges
  evil-want-Y-yank-to-eol t ; Make Y consistent with other capitals
@@ -103,7 +100,6 @@
  evil-emacs-state-modes '(debugger-mode))
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
-(add-hook 'evil-local-mode-hook #'undo-tree-mode)
 
 ;; Inherit command-line mappings in minibuffers
 (set-keymap-parent minibuffer-local-map evil-command-line-map)
@@ -228,8 +224,7 @@ additional COUNT."
 Either nil or a tuple \(CACHE ALL ITER . DELTAS) where CACHE is a
 zipper \(LATER-POSS . EARLIER-POSS) of change positions already moved
 to, ALL is the sorted concatenation of LATER-POSS and EARLIER-POSS,
-ITER is the remaining tail of `buffer-undo-list', or next
-`buffer-undo-tree' node if undo-tree is enabled, and DELTAS is seen
+ITER is the remaining tail of `buffer-undo-list', and DELTAS is seen
 change digests in chronological order.")
 
 (defun goto-chg--reset (&rest _)
@@ -242,13 +237,10 @@ Start over if changes have been made. If two changes are on the same
 line less than `fill-column' or 79 columns apart only the last one is
 considered."
   (interactive "p")
-  (cl-destructuring-bind (cache all l . deltas)
+  (cl-destructuring-bind (cache all list . deltas)
       (or goto-chg--state
           (progn (add-hook 'after-change-functions #'goto-chg--reset nil t)
-                 (list (cons () ()) ()
-                       (if (not (bound-and-true-p undo-tree-mode)) buffer-undo-list
-                         (undo-list-transfer-to-tree)
-                         (undo-tree-current buffer-undo-tree)))))
+                 (list (cons () ()) () buffer-undo-list)))
     (when-let ((p (car (if (< count 0) (car cache) (cdr cache))))
                ((= (if (not (or (evil-normal-state-p) (evil-motion-state-p))) p
                      (save-excursion (goto-char p) (evil-adjust-cursor) (point)))
@@ -258,12 +250,11 @@ considered."
       (setq count (1+ count)) (push (goto-char (pop (car cache))) (cdr cache)))
     (while (and (> count 0) (cdr cache))
       (setq count (1- count)) (push (goto-char (pop (cdr cache))) (car cache)))
-    (while (and (> count 0) l)
-      (let ((list (if (bound-and-true-p undo-tree-mode) (undo-tree-node-undo l) l))
-            (old-deltas deltas) pos)
+    (while (and (> count 0) list)
+      (let ((old-deltas deltas) pos)
         ;; Collect deltas and position of most recent change in this changeset
         (while (pcase (pop list)
-                 ('nil nil) ; Undo boundary
+                 ('nil) ; Undo boundary
                  (`(,(and (pred integerp) beg) . ,end) ; Insertion
                   (unless pos (setq pos (1- end)))
                   (push (cons beg (cons beg (- end beg))) deltas))
@@ -272,7 +263,7 @@ considered."
                     (unless pos (setq pos beg))
                     (push (cons beg (cons (+ beg len) (- len))) deltas)))
                  (`(nil ,_property ,_value ,_beg . ,end) ; Textprop change
-                  (if pos t (setq pos end)))
+                  (unless pos (setq pos end)) t)
                  (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
                   (unless pos (setq pos end))
                   (push (cons beg (cons end delta)) deltas))
@@ -286,20 +277,19 @@ considered."
                        finally return (or prev (cons nil xs)))
             (cl-flet ((too-close-p (min max)
                         (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
-                          (save-excursion (goto-char min) (not (search-forward "\n" max t))))))
+                          (not (save-excursion (goto-char min) (search-forward "\n" max t))))))
               (unless (or (and left (too-close-p left pos))
                           (and right (too-close-p pos right)))
                 (setq count (1- count))
                 (push pos (if left (cdr tail) all))
-                (push (goto-char pos) (car cache))))))
-        (setq l (if (bound-and-true-p undo-tree-mode) (undo-tree-node-previous l) list))))
-    (setq goto-chg--state (cons cache (cons all (cons l deltas)))))
+                (push (goto-char pos) (car cache))))))))
+    (setq goto-chg--state (cons cache (cons all (cons list deltas)))))
   (or (= count 0) (error "No %s change info" (if (< count 0) "later" "further"))))
 (defalias #'evil-goto-last-change #'older-change)
 
 (evil-define-motion newer-change (count)
   "Go to COUNT newer position in change list.
-Just like \\[evil-goto-last-change] but in the opposite direction."
+Like \\[evil-goto-last-change] but in the opposite direction."
   (interactive "p")
   (older-change (- count)))
 (defalias #'evil-goto-last-change-reverse #'newer-change)
@@ -812,10 +802,11 @@ If a prefix argument is given, the messages will be \"undeleted\"."
 
 (straight-use-package 'rmsbolt) ; Compiler Explorer
 
+(straight-use-package 'vundo)
 (evil-define-key* 'normal 'global
   "\C-^" 'evil-switch-to-windows-last-buffer
   "\C-a" 'inc-at-point "\C-x" 'dec-at-point
-  "U" 'undo-tree-visualize
+  "U" 'vundo
   "gc" 'evil-comment
   [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
