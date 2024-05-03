@@ -872,10 +872,14 @@ Works with: statement, statement-cont."
       (arglist-close
        . ,(lambda (langelem) (if (eq (c-lineup-close-paren langelem) 0) 0 '+)))
       (label . 0) (substatement-label . 0)))))
+(with-eval-after-load 'cc-mode (define-key c-mode-base-map (kbd "TAB") nil t))
 (setq c-cleanup-list '(comment-close-slash)
       c-electric-pound-behavior '(alignleft)
       c-indent-comments-syntactically-p t
       c-default-style '((java-mode . "java") (awk-mode . "awk") (other . "my-style")))
+;; Recognize Doxygen style instead of GtkDoc in C/C++
+(setq-default c-doc-comment-style '((java-mode . javadoc) (pike-mode . autodoc)
+                                    (c-mode . doxygen) (c++-mode . doxygen)))
 
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
