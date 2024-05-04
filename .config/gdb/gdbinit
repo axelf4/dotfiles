@@ -4,3 +4,5 @@ set pagination off
 set history remove-duplicates 1
 
 set disassembly-flavor intel
+
+set environment LSAN_OPTIONS=detect_leaks=0
