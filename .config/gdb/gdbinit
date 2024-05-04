@@ -1,5 +1,6 @@
 set confirm off
 set pagination off
+set history save
 # Do not add adjacent duplicate history entries
 set history remove-duplicates 1
 

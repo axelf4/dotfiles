@@ -3,5 +3,5 @@
 \#*#
 *~
 
-tags
-.projectile
+TAGS
+.gdb_history
