@@ -53,7 +53,7 @@
    (when electric-indent-regexp
      (save-excursion (backward-word) (looking-at-p electric-indent-regexp)))))
 
-;;; System clipboard support when running in terminal
+;;; System clipboard support in terminal
 (when-let (backend (or (when (executable-find "wl-copy") 'wl-clipboard)
                        (when (executable-find "xclip") 'xclip)))
   (cl-defmethod gui-backend-get-selection
@@ -601,22 +601,22 @@ mode buffer."
 ;;; Insert mode completion
 (straight-use-package 'corfu)
 (with-eval-after-load 'corfu
-  (let ((kind-text-mapping
-         '((variable "v" . font-lock-variable-name-face)
-           (file "f" . font-lock-string-face)
-           (folder "d" . font-lock-doc-face)
-           (function "f" . font-lock-function-name-face)
-           (keyword "k" . font-lock-keyword-face)
-           (snippet "S" . font-lock-string-face))))
-    (defun kind-margin-formatter (_metadata)
-      (when-let (kind-fun (plist-get completion-extra-properties :company-kind))
-        (lambda (s)
-          (if-let (x (alist-get (funcall kind-fun s) kind-text-mapping))
-              (let ((s (format " %s " (car x)))
-                    (face `(:foreground ,(face-attribute (cdr x) :foreground) :weight bold)))
-                (put-text-property 0 (length s) 'face face s)
-                s)
-            "")))))
+  (defun kind-margin-formatter (_metadata)
+    (when-let (kind-fun (plist-get completion-extra-properties :company-kind))
+      (lambda (s)
+        (if-let (x (alist-get
+                    (funcall kind-fun s)
+                    '((file "f" . font-lock-string-face)
+                      (folder "d" . font-lock-doc-face)
+                      (keyword "k" . font-lock-keyword-face)
+                      (function "f" . font-lock-function-name-face)
+                      (snippet "S" . font-lock-string-face)
+                      (variable "v" . font-lock-variable-name-face))))
+            (let ((s (format " %s " (car x)))
+                  (face `(:foreground ,(face-attribute (cdr x) :foreground) :weight bold)))
+              (put-text-property 0 (length s) 'face face s)
+              s)
+          ""))))
   (setq corfu-quit-at-boundary t corfu-quit-no-match t
         corfu-cycle t
         corfu-margin-formatters '(kind-margin-formatter))
@@ -881,6 +881,20 @@ Works with: statement, statement-cont."
 (setq-default c-doc-comment-style '((java-mode . javadoc) (pike-mode . autodoc)
                                     (c-mode . doxygen) (c++-mode . doxygen)))
 
+(straight-use-package 'cmake-mode)
+(defun cmake-completion-at-point ()
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
+    (list (or (car bounds) (point)) (or (cdr bounds) (point))
+          (cl-loop for (arg . kind) in '(("--help-command-list" . function)
+                                         ("--help-variable-list" . variable))
+                   for xs = (process-lines cmake-mode-cmake-executable arg) nconc
+                   (dolist (s xs xs) (put-text-property 0 (length s) 'kind kind s)))
+          :company-kind (lambda (s) (get-text-property 0 'kind s)))))
+(add-hook 'cmake-mode-hook
+          (lambda ()
+            (setq-local evil-lookup-func #'cmake-help)
+            (add-hook 'completion-at-point-functions #'cmake-completion-at-point nil t)))
+
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
 (add-hook 'rust-mode-hook
@@ -907,12 +921,11 @@ Works with: statement, statement-cont."
 
 (straight-use-package 'haskell-mode)
 (straight-use-package 'yaml-mode)
-(straight-use-package 'cmake-mode)
 (straight-use-package 'julia-mode)
 
 (straight-use-package 'nix-mode)
 (add-hook 'nix-mode-hook
-          (lambda () (setq electric-indent-regexp "else")))
+          (lambda () (setq electric-indent-regexp "in\\|then\\|else")))
 
 (straight-use-package 'lua-mode)
 (setq lua-indent-level 4)
