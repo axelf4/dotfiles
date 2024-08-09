@@ -11,7 +11,6 @@
       use-short-answers t
       scroll-conservatively most-positive-fixnum ; Do not center cursor after scrolling
       truncate-partial-width-windows nil ; Always soft-wrap
-      window-combination-resize t
       select-enable-clipboard nil ; Do not tie unnamed register "" to system clipboard
       xterm-store-paste-on-kill-ring nil
       make-backup-files nil
@@ -54,8 +53,8 @@
      (save-excursion (backward-word) (looking-at-p electric-indent-regexp)))))
 
 ;;; System clipboard support in terminal
-(when-let (backend (or (when (executable-find "wl-copy") 'wl-clipboard)
-                       (when (executable-find "xclip") 'xclip)))
+(when-let (backend (cond ((executable-find "wl-copy") 'wl-clipboard)
+                         ((executable-find "xclip") 'xclip)))
   (cl-defmethod gui-backend-get-selection
     (selection-symbol target-type &context (window-system nil))
     (with-output-to-string
@@ -205,8 +204,8 @@ additional COUNT."
     (evil-apply-on-block
      (let ((amount count))
        (lambda (beg end) (goto-char beg)
-         (and (search-forward-inc amount end)
-              cumulative (setq amount (+ amount count)))))
+         (and (search-forward-inc amount end) cumulative
+              (setq amount (+ amount count)))))
      (goto-char evil-visual-beginning) evil-visual-end nil))
    (t (goto-char evil-visual-beginning)
       (let ((amount count))
@@ -274,7 +273,7 @@ considered."
                    do (setq pos (+ (if (< pos end) end pos) delta)))
           (cl-destructuring-bind (&whole tail &optional left right . _)
               (cl-loop for xs on all and prev = nil then xs while (< (car xs) pos)
-                       finally return (or prev (cons nil xs)))
+                       finally return (or prev (cons nil all)))
             (cl-flet ((too-close-p (min max)
                         (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
                           (not (save-excursion (goto-char min) (search-forward "\n" max t))))))
@@ -728,9 +727,13 @@ would never be attempted in case of TAB cycle indentation."
 
 ;;; Language server protocol
 (setq eglot-extend-to-xref t
+      eglot-confirm-server-initiated-edits nil
       eglot-ignored-server-capabilities '(:documentHighlightProvider))
 (advice-add #'eglot--current-project :around #'with-cwd)
 (advice-add #'jsonrpc--log-event :override #'ignore)
+(with-eval-after-load 'eglot
+  (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
+  (define-key eglot-mode-map [f2] 'eglot-rename))
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
@@ -804,10 +807,10 @@ If a prefix argument is given, the messages will be \"undeleted\"."
 
 (straight-use-package 'vundo)
 (evil-define-key* 'normal 'global
-  "\C-^" 'evil-switch-to-windows-last-buffer
   "\C-a" 'inc-at-point "\C-x" 'dec-at-point
   "U" 'vundo
   "gc" 'evil-comment
+  "gr" 'xref-find-references
   [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
   (kbd "<leader>h") 'help-command
@@ -825,6 +828,7 @@ If a prefix argument is given, the messages will be \"undeleted\"."
   (kbd "<leader>m") 'notmuch-jump-search)
 (define-key universal-argument-map (kbd "<leader>u") 'universal-argument-more)
 (evil-define-key* 'motion 'global
+  "\C-^" 'evil-switch-to-windows-last-buffer
   "[c" 'evil-backward-conflict "]c" 'evil-forward-conflict)
 (evil-define-key* 'visual 'global
   "u" nil

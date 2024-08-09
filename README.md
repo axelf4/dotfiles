@@ -7,8 +7,8 @@
 ## Installation
 
 ```sh
-git clone --bare https://github.com/axelf4/dotfiles.git $HOME/.dotfiles
-alias cfg="git --git-dir=$HOME/.dotfiles --work-tree=$HOME"
+git clone --bare https://github.com/axelf4/dotfiles.git ~/.dotfiles
+alias cfg='git --git-dir="$HOME"/.dotfiles --work-tree="$HOME"'
 cfg checkout
 cfg config --local status.showUntrackedFiles no
 ```
@@ -41,12 +41,12 @@ The table below shows what files Bash executes on startup.
 	</tr>
 </table>
 
-To have have login shells too read the shell configuration file
+To have login shells too read the shell configuration file
 (e.g. because tmux always starts login shells),
 create a `.bash_profile` with
 ```bash
-[[ -f ~/.profile ]] && . ~/.profile
-[[ -f ~/.bashrc ]] && . ~/.bashrc
+[[ -e ~/.profile ]] && . ~/.profile
+[[ -e ~/.bashrc ]] && . ~/.bashrc
 ```
 Note however that it is then necessary to test if interactive (with `$-`)
 before trying to change terminal settings.

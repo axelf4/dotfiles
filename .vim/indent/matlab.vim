@@ -1,6 +1,6 @@
 " Vim indent file
 " Language: MATLAB
-" Author: Axel Forsman <axelsfor@gmail.com>
+" Author: Axel Forsman <axel@axelf.se>
 " License: MIT
 
 " Only load if no other indent file is loaded

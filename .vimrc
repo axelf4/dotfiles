@@ -27,12 +27,13 @@ set cpoptions+=M " Fix Haskell lambda with tuple pattern messing with "%"
 silent! colorscheme apprentice
 let mapleader = "\<Space>"
 nnoremap Y y$| " Make Y behave like other capitals
-nnoremap <F5> :wall<Bar>make<CR>
-" Write with sudo from within Vim
-command! -bar W w !sudo tee % >/dev/null
 " Repeat g; if the cursor is already at the previous change
 nnoremap <expr> g; {l, c -> l[0]->get(l[1] - 1, {}) == #{lnum: c[1], col: c[2] - 1,
 			\ coladd: c[3]}}(getchangelist(), getcurpos()) + 1 .. 'g;'
+nnoremap <F9> <Cmd>wall<Bar>make<CR>
+noremap <leader>w <C-w>
+" Write with sudo from within Vim
+command! -bar W w !sudo tee % >/dev/null
 augroup vimrc
 	autocmd!
 augroup END

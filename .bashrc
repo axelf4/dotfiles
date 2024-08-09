@@ -29,7 +29,7 @@ bind -x '"\C-z": fg' # Make Control-z toggle fore-/background
 bind '"\C-n": dabbrev-expand'
 
 bind 'Return: "\xff0\n"'
-bind -x '"\xff0": [[ -z "$READLINE_LINE" ]] 2>/dev/null && READLINE_LINE=\ status'
+bind -x '"\xff0": [[ $READLINE_LINE ]] 2>/dev/null || READLINE_LINE=\ status'
 
 alias e=\$VISUAL
 alias o=xdg-open
