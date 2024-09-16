@@ -928,6 +928,8 @@ Works with: statement, statement-cont."
 (straight-use-package 'julia-mode)
 
 (straight-use-package 'nix-mode)
+(autoload 'nix-shebang-mode "nix-shebang")
+(push '("nix-shell" . nix-shebang-mode) interpreter-mode-alist)
 (add-hook 'nix-mode-hook
           (lambda () (setq electric-indent-regexp "in\\|then\\|else")))
 
