@@ -354,7 +354,8 @@ Like \\[evil-goto-last-change] but in the opposite direction."
       read-extended-command-predicate #'command-completion-default-include-p
       completion-styles '(hotfuzz)
       completion-category-defaults ()
-      completion-category-overrides `((eglot (styles . ,completion-styles))))
+      completion-category-overrides '((buffer (display-sort-function . identity)) ; Keep MRU
+                                      (eglot (styles hotfuzz))))
 (vertico-mode)
 
 (defun minibuffer-completion-in-region (start end collection &optional predicate)
@@ -382,7 +383,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
 (add-hook
  'server-after-make-frame-hook
  (lambda ()
-   (when-let ((client (frame-parameter nil 'client)))
+   (when-let (client (frame-parameter nil 'client))
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
 (advice-add #'evil-ex :around #'with-cwd)
 
@@ -462,6 +463,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
 ;;; Reading documentation
 (setq help-window-select t
       help-window-keep-selected t)
+(add-hook 'help-fns-describe-function-functions #'shortdoc-help-fns-examples-function)
 (evil-define-key* 'normal help-mode-map
   "\C-t" 'help-go-back
   "s" 'help-view-source)
@@ -726,18 +728,19 @@ would never be attempted in case of TAB cycle indentation."
          (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
 
 ;;; Language server protocol
-(setq eglot-extend-to-xref t
-      eglot-confirm-server-initiated-edits nil
-      eglot-ignored-server-capabilities '(:documentHighlightProvider))
+(setq flymake-indicator-type nil ; Do not reserve margin for errors
+      eglot-confirm-server-edits nil
+      eglot-extend-to-xref t
+      eglot-ignored-server-capabilities '(:documentHighlightProvider)
+      jsonrpc-event-hook ())
 (advice-add #'eglot--current-project :around #'with-cwd)
-(advice-add #'jsonrpc--log-event :override #'ignore)
 (with-eval-after-load 'eglot
   (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
   (define-key eglot-mode-map [f2] 'eglot-rename))
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
-(define-advice evil-next-flyspell-error (:before (&rest _))
+(define-advice evil-next-flyspell-error (:before (&optional _count))
   (unless (bound-and-true-p flyspell-mode) (flyspell-mode) (flyspell-buffer)))
 (with-eval-after-load 'flyspell
   (define-key flyspell-mouse-map (kbd "RET")
@@ -901,8 +904,7 @@ Works with: statement, statement-cont."
 
 (straight-use-package 'rust-mode)
 (setq rust-format-on-save t)
-(add-hook 'rust-mode-hook
-          (lambda () (setq indent-tabs-mode nil)))
+(add-hook 'rust-mode-hook (lambda () (setq indent-tabs-mode nil)))
 
 (add-hook 'sh-mode-hook
           (lambda () (setq electric-indent-regexp "fi\\|else\\|done\\|esac")))
@@ -915,12 +917,10 @@ Works with: statement, statement-cont."
 (straight-use-package 'typescript-mode)
 (defun add-node-modules-to-path ()
   "Add node_modules/.bin to buffer-local `exec-path', if applicable."
-  (when-let ((root (locate-dominating-file ; "npm bin" is too slow
-                    (or buffer-file-name default-directory)
-                    "node_modules")))
+  (when-let (root (locate-dominating-file ; "npm bin" is too slow
+                   (or buffer-file-name default-directory) "node_modules"))
     (make-local-variable 'exec-path)
-    (cl-pushnew (expand-file-name "node_modules/.bin" root) exec-path
-                :test #'string=)))
+    (cl-pushnew (expand-file-name "node_modules/.bin" root) exec-path :test #'equal)))
 (add-hook 'typescript-mode-hook #'add-node-modules-to-path)
 
 (straight-use-package 'haskell-mode)
