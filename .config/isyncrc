@@ -1,8 +1,8 @@
 IMAPAccount gmail
 Host imap.gmail.com
-SSLType IMAPS
+TLSType IMAPS
 User axelsfor@gmail.com
-PassCmd "kwallet-query --read-password mbsync/axelsfor@gmail.com kdewallet"
+PassCmd "kwallet-query --read-password isync/axelsfor@gmail.com kdewallet"
 
 IMAPStore gmail-remote
 Account gmail
