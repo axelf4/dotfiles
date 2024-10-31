@@ -5,7 +5,6 @@ Plug 'editorconfig/editorconfig-vim'
 Plug 'axelf4/vim-strip-trailing-whitespace'
 Plug 'mattn/emmet-vim'
 Plug 'junegunn/goyo.vim'
-Plug 'romainl/Apprentice'
 
 Plug 'rust-lang/rust.vim'
 Plug 'axelf4/vim-haskell'
@@ -24,7 +23,7 @@ set formatoptions+=j " Remove comment leaders when joining lines
 set splitbelow splitright
 set cpoptions+=M " Fix Haskell lambda with tuple pattern messing with "%"
 
-silent! colorscheme apprentice
+silent! colorscheme retrobox
 let mapleader = "\<Space>"
 nnoremap Y y$| " Make Y behave like other capitals
 " Repeat g; if the cursor is already at the previous change
