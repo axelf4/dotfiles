@@ -424,7 +424,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
   (when (executable-find "rg")
     ;; Cannot use `grep-apply-setting' since we only want ripgrep
     ;; where we know it is available.
-    (grep-compute-defaults) ; Populate defaults
+    (grep-compute-defaults)
     (setcdr (assq 'localhost grep-host-defaults-alist)
             '((grep-command "rg --no-heading -Hn0 ")
               (grep-use-null-device nil)
@@ -645,7 +645,7 @@ mode buffer."
          for i from 0 and line in lines and op = sp then np with np and nl-p and j = 1 and xs do
          (let ((p0 (point))
                (p1 (progn (setq nl-p (/= (vertical-motion (cons col (* dir j))) 0)) (point)))
-               col0 (face (if (= i curr) 'corfu-current 'corfu-default))
+               col0 (face (if (eq i curr) 'corfu-current 'corfu-default))
                (bar (if (and lo (<= lo i (+ lo bar))) #(" " 0 1 (face corfu-bar))
                       #(" " 0 1 (face corfu-current)))))
            (setq j (if (= p1 p0) (1+ j) 1)
@@ -729,6 +729,7 @@ would never be attempted in case of TAB cycle indentation."
 
 ;;; Language server protocol
 (setq flymake-indicator-type nil ; Do not reserve margin for errors
+      flymake-fringe-indicator-position nil ; Do not show "!" at errors
       eglot-confirm-server-edits nil
       eglot-extend-to-xref t
       eglot-ignored-server-capabilities '(:documentHighlightProvider)
@@ -899,7 +900,8 @@ Works with: statement, statement-cont."
           :company-kind (lambda (s) (get-text-property 0 'kind s)))))
 (add-hook 'cmake-mode-hook
           (lambda ()
-            (setq-local evil-lookup-func #'cmake-help)
+            (setq-local electric-indent-chars (cons ?\) electric-indent-chars)
+                        evil-lookup-func #'cmake-help)
             (add-hook 'completion-at-point-functions #'cmake-completion-at-point nil t)))
 
 (straight-use-package 'rust-mode)
@@ -938,6 +940,7 @@ Works with: statement, statement-cont."
 (add-hook 'lua-mode-hook
           (lambda () (setq electric-indent-regexp "end\\|else\\|until")))
 
+(straight-use-package 'earl)
 (setq erlang-electric-commands '(erlang-electric-semicolon
                                  erlang-electric-gt
                                  erlang-electric-newline))
