@@ -385,6 +385,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
  (lambda ()
    (when-let (client (frame-parameter nil 'client))
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
+(add-hook 'project-find-functions (lambda (_dir) (cons 'transient (cwd))) 50)
 (advice-add #'evil-ex :around #'with-cwd)
 
 (let ((find-files-program
@@ -734,7 +735,6 @@ would never be attempted in case of TAB cycle indentation."
       eglot-extend-to-xref t
       eglot-ignored-server-capabilities '(:documentHighlightProvider)
       jsonrpc-event-hook ())
-(advice-add #'eglot--current-project :around #'with-cwd)
 (with-eval-after-load 'eglot
   (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
   (define-key eglot-mode-map [f2] 'eglot-rename))
