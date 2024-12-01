@@ -2,7 +2,7 @@
 
 ;; Bootstrap the straight.el package manager
 (load (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory)
-      nil 'nomessage)
+      nil t)
 
 (setq gc-cons-threshold #x1000000
       native-comp-async-report-warnings-errors 'silent
@@ -152,6 +152,7 @@
       (push (+ ?0 (logand num 1)) digits)
       (setq num (ash num -1)))
     (apply #'string (or digits '(?0)))))
+
 (defun search-forward-inc (amount &optional bound)
   "Increment the next number after point ending before BOUND by AMOUNT.
 If fail return nil, otherwise set point to the end of the number found
@@ -284,14 +285,14 @@ considered."
                 (push (goto-char pos) (car cache))))))))
     (setq goto-chg--state (cons cache (cons all (cons list deltas)))))
   (or (= count 0) (error "No %s change info" (if (< count 0) "later" "further"))))
-(defalias #'evil-goto-last-change #'older-change)
+(fset #'evil-goto-last-change #'older-change)
 
 (evil-define-motion newer-change (count)
   "Go to COUNT newer position in change list.
 Like \\[evil-goto-last-change] but in the opposite direction."
   (interactive "p")
   (older-change (- count)))
-(defalias #'evil-goto-last-change-reverse #'newer-change)
+(fset #'evil-goto-last-change-reverse #'newer-change)
 
 (defun comment-join-line (beg end)
   "Join lines in the BEG .. END region with comment leaders removed."
@@ -371,6 +372,118 @@ Like \\[evil-goto-last-change] but in the opposite direction."
     (unless completion-fail-discreetly (completion--message "No completions"))
     nil))
 
+;;; Insert mode completion
+(straight-use-package 'corfu)
+(defvar corfu-terminal--ov nil)
+(cl-defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar &aux save-pos buffer)
+  "Show the Corfu `corfu--popup-show' completion popup using overlays."
+  (when corfu-terminal--ov (delete-overlay corfu-terminal--ov))
+  (setq save-pos (point)
+        buffer (make-indirect-buffer (current-buffer) (generate-new-buffer-name " *temp*") nil t))
+  (unwind-protect
+      (cl-loop
+       with (x . y) = (posn-x-y pos)
+       with col = (min (max 0 (- x (line-number-display-width) off))
+                       (- (window-text-width) width 5))
+       and dir = (if (< (+ y (length lines)) (window-text-height)) 1 -1)
+       with sp = (save-excursion (vertical-motion (max 0 dir)) (point))
+       initially (vertical-motion (cons (if (< dir 0) 0 (- (window-width) 2)) 0))
+       for i from 0 and line in lines and op = sp then np with np and nl-p and j = 1 and xs do
+       (let ((p0 (point))
+             (p1 (progn (setq nl-p (/= (vertical-motion (cons col (* dir j))) 0)) (point)))
+             col0 (face (if (eq i curr) 'corfu-current 'corfu-default))
+             (bar (if (and lo (<= lo i (+ lo bar))) #(" " 0 1 (face corfu-bar))
+                    #(" " 0 1 (face corfu-current)))))
+         (setq j (if (= p1 p0) (1+ j) 1)
+               np (max p1 (save-excursion (vertical-motion (cons (+ col width 2) 0)) (point))))
+         (when (< dir 0) (cl-rotatef p1 np))
+         (when (> op p1) (cl-rotatef op p1))
+         ;; One visual line can be many logical lines (e.g. fold overlay)
+         (with-current-buffer buffer
+           (cl-destructuring-bind (pos _hpos vpos . _)
+               (compute-motion op (cons (+ col width 2) 0) p1 (cons col 1)
+                               nil (cons (window-hscroll) 0) nil)
+             (push (buffer-substring op (if (> vpos 1) (setq pos (1- pos)) pos)) xs)
+             (setq col0 (if (and (not (and (> dir 0) (= i 0) nl-p)) (< vpos 1))
+                            (progn (push #(" \n" 0 1 (cursor 1)) xs) 0)
+                          (goto-char (if (< dir 0) op pos)) (vertical-motion 0) (current-column)))))
+         (let ((l (concat line (propertize " " 'display `(space :align-to (,(+ col0 col width 1)))))))
+           (add-face-text-property 0 (length l) face nil l)
+           (push (concat (propertize " " 'display `(space :align-to ,(+ col0 col))) l bar) xs)))
+       finally (goto-char np)
+       (if (> dir 0) (setq xs (nreverse xs))
+         (while (and (> j 1) (/= (vertical-motion (cons (- (window-width) 2) (- j))) 0) (= (point) np))
+           (setq j (1+ j)) (push "\n" xs)))
+       (let ((ov (setq corfu-terminal--ov (make-overlay sp (point) nil t t)))
+             (s (apply #'concat xs)))
+         (remove-list-of-text-properties 0 (length s) '(line-prefix) s)
+         (add-face-text-property 0 (length s) 'default t s)
+         (overlay-put ov 'window (selected-window))
+         (overlay-put ov 'before-string s)
+         (overlay-put ov 'display ""))))
+  (kill-buffer buffer) (goto-char save-pos))
+(defun corfu-terminal--popup-hide ()
+  "Hide Corfu overlays popup."
+  (delete-overlay corfu-terminal--ov))
+(defun kind-margin-formatter (_metadata)
+  (when-let (kind-fun (plist-get completion-extra-properties :company-kind))
+    (lambda (s)
+      (if-let (x (alist-get
+                  (funcall kind-fun s)
+                  '((file "f" . font-lock-string-face)
+                    (folder "d" . font-lock-doc-face)
+                    (keyword "k" . font-lock-keyword-face)
+                    (function "f" . font-lock-function-name-face)
+                    (snippet "S" . font-lock-string-face)
+                    (variable "v" . font-lock-variable-name-face))))
+          (let ((s (format " %s " (car x)))
+                (face `(:foreground ,(face-attribute (cdr x) :foreground) :weight bold)))
+            (put-text-property 0 (length s) 'face face s)
+            s)
+        ""))))
+;; Restrict size of Corfu popup to fit in window
+(define-advice corfu--candidates-popup (:around (orig-fun pos))
+  (let* ((y (cdr (posn-x-y pos)))
+         (corfu-max-width (min corfu-max-width (- (window-text-width) 5)))
+         (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
+    (funcall orig-fun pos)))
+(setq corfu-quit-at-boundary t corfu-quit-no-match t
+      corfu-cycle t
+      corfu-margin-formatters '(kind-margin-formatter)
+      completion-in-region-function
+      (lambda (&rest args)
+        (apply (if (minibufferp) #'minibuffer-completion-in-region
+                 (corfu-mode) completion-in-region-function)
+               args)))
+(define-advice corfu--setup (:after (&rest _)) (evil-normalize-keymaps))
+(define-advice corfu--teardown (:after (buf))
+  (when (buffer-live-p buf) (with-current-buffer buf (evil-normalize-keymaps))))
+(with-eval-after-load 'corfu
+  (fset #'corfu--popup-support-p #'always)
+  (fset #'corfu--popup-show #'corfu-terminal--popup-show)
+  (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
+
+  (evil-make-overriding-map corfu-map)
+  (evil-define-key* nil corfu-map
+    [escape] 'corfu-quit (kbd "TAB") 'corfu-next [backtab] 'corfu-previous))
+(define-key global-map [remap indent-for-tab-command]
+  (lambda (arg)
+    "Perform symbol completion and/or indent if in the left margin.
+Differs from having `tab-always-indent' set to `complete' by always
+completing if point is right of the left margin. Otherwise, completion
+would never be attempted in case of TAB cycle indentation."
+    (interactive "P")
+    (setq this-command 'indent-for-tab-command)
+    (if (> (current-column) (current-indentation))
+        (completion-at-point)
+      (let ((tab-always-indent 'complete) transient-mark-mode)
+        (indent-for-tab-command arg)))))
+;; Insert completion without overwriting text right of cursor
+(define-advice completion--capf-wrapper (:filter-return (res) nil -1)
+  (and (consp (cdr-safe res)) (not (functionp (cdr res)))
+       (setcar (nthcdr 2 res) (point))) ; Set `end' to point
+  res)
+
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
 (push 'cwd frame-inherited-parameters)
@@ -420,8 +533,24 @@ Like \\[evil-goto-last-change] but in the opposite direction."
      "/")
    "sudo::" (or (file-remote-p file 'localname) file)))
 
+(defun file-completion-at-point (&optional interactive)
+  "Complete file name at point."
+  (interactive "p")
+  (if interactive
+      (let ((completion-at-point-functions '(file-completion-at-point)))
+        (completion-at-point))
+    (require 'ffap)
+    (ffap-string-at-point)
+    `(,@ffap-string-at-point-region
+      completion-file-name-table
+      :predicate ,(lambda (s) (not (string= s "./")))
+      :company-kind ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
+      :exit-function ; Continue completing descendants of directory
+      ,(lambda (s _status)
+         (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
+
+(setq grep-save-buffers nil)
 (with-eval-after-load 'grep
-  (setq grep-save-buffers nil)
   (when (executable-find "rg")
     ;; Cannot use `grep-apply-setting' since we only want ripgrep
     ;; where we know it is available.
@@ -460,19 +589,6 @@ Like \\[evil-goto-last-change] but in the opposite direction."
    (:eval (let ((len (string-width (format-mode-line mode-line-position))))
             (propertize " " 'display `(space :align-to (- right ,(1+ len))))))
    mode-line-position))
-
-;;; Reading documentation
-(setq help-window-select t
-      help-window-keep-selected t)
-(add-hook 'help-fns-describe-function-functions #'shortdoc-help-fns-examples-function)
-(evil-define-key* 'normal help-mode-map
-  "\C-t" 'help-go-back
-  "s" 'help-view-source)
-
-(straight-use-package 'devdocs)
-(setq devdocs-window-select t)
-(add-hook 'devdocs-mode-hook (lambda () (kill-local-variable 'truncate-lines)))
-(define-key help-map "D" 'devdocs-lookup)
 
 ;;; Compilation
 (straight-use-package 'xterm-color)
@@ -600,134 +716,6 @@ mode buffer."
            ,(lambda (s _status)
               (yas-expand-snippet (gethash s table) (- (point) (length s)) (point)))))))))
 
-;;; Insert mode completion
-(straight-use-package 'corfu)
-(with-eval-after-load 'corfu
-  (defun kind-margin-formatter (_metadata)
-    (when-let (kind-fun (plist-get completion-extra-properties :company-kind))
-      (lambda (s)
-        (if-let (x (alist-get
-                    (funcall kind-fun s)
-                    '((file "f" . font-lock-string-face)
-                      (folder "d" . font-lock-doc-face)
-                      (keyword "k" . font-lock-keyword-face)
-                      (function "f" . font-lock-function-name-face)
-                      (snippet "S" . font-lock-string-face)
-                      (variable "v" . font-lock-variable-name-face))))
-            (let ((s (format " %s " (car x)))
-                  (face `(:foreground ,(face-attribute (cdr x) :foreground) :weight bold)))
-              (put-text-property 0 (length s) 'face face s)
-              s)
-          ""))))
-  (setq corfu-quit-at-boundary t corfu-quit-no-match t
-        corfu-cycle t
-        corfu-margin-formatters '(kind-margin-formatter))
-  (evil-define-key* nil corfu-map
-    [escape] 'corfu-quit (kbd "TAB") 'corfu-next [backtab] 'corfu-previous)
-  (evil-make-overriding-map corfu-map)
-  (define-advice corfu--setup (:after (&rest _)) (evil-normalize-keymaps))
-  (define-advice corfu--teardown (:after (buf))
-    (when (buffer-live-p buf) (with-current-buffer buf (evil-normalize-keymaps))))
-
-  (defvar corfu-terminal--ov nil)
-  (cl-defun corfu-terminal--popup-show (pos off width lines &optional curr lo bar &aux save-pos buffer)
-    "Show the Corfu `corfu--popup-show' completion popup using overlays."
-    (when corfu-terminal--ov (delete-overlay corfu-terminal--ov))
-    (setq save-pos (point)
-          buffer (make-indirect-buffer (current-buffer) (generate-new-buffer-name " *temp*") nil t))
-    (unwind-protect
-        (cl-loop
-         with (x . y) = (posn-x-y pos)
-         with col = (min (max 0 (- x (line-number-display-width) off))
-                         (- (window-text-width) width 5))
-         and dir = (if (< (+ y (length lines)) (window-text-height)) 1 -1)
-         with sp = (save-excursion (vertical-motion (max 0 dir)) (point))
-         initially (vertical-motion (cons (if (< dir 0) 0 (- (window-width) 2)) 0))
-         for i from 0 and line in lines and op = sp then np with np and nl-p and j = 1 and xs do
-         (let ((p0 (point))
-               (p1 (progn (setq nl-p (/= (vertical-motion (cons col (* dir j))) 0)) (point)))
-               col0 (face (if (eq i curr) 'corfu-current 'corfu-default))
-               (bar (if (and lo (<= lo i (+ lo bar))) #(" " 0 1 (face corfu-bar))
-                      #(" " 0 1 (face corfu-current)))))
-           (setq j (if (= p1 p0) (1+ j) 1)
-                 np (max p1 (save-excursion (vertical-motion (cons (+ col width 2) 0)) (point))))
-           (when (< dir 0) (cl-rotatef p1 np))
-           (when (> op p1) (cl-rotatef op p1))
-           ;; One visual line can be many logical lines (e.g. fold overlay)
-           (with-current-buffer buffer
-             (cl-destructuring-bind (pos _hpos vpos . _)
-                 (compute-motion op (cons (+ col width 2) 0) p1 (cons col 1)
-                                 nil (cons (window-hscroll) 0) nil)
-               (push (buffer-substring op (if (> vpos 1) (setq pos (1- pos)) pos)) xs)
-               (setq col0 (if (and (not (and (> dir 0) (= i 0) nl-p)) (< vpos 1))
-                              (progn (push #(" \n" 0 1 (cursor 1)) xs) 0)
-                            (goto-char (if (< dir 0) op pos)) (vertical-motion 0) (current-column)))))
-           (let ((l (concat line (propertize " " 'display `(space :align-to (,(+ col0 col width 1)))))))
-             (add-face-text-property 0 (length l) face nil l)
-             (push (concat (propertize " " 'display `(space :align-to ,(+ col0 col))) l bar) xs)))
-         finally (goto-char np)
-         (if (> dir 0) (setq xs (nreverse xs))
-           (while (and (> j 1) (/= (vertical-motion (cons (- (window-width) 2) (- j))) 0) (= (point) np))
-             (setq j (1+ j)) (push "\n" xs)))
-         (let ((ov (setq corfu-terminal--ov (make-overlay sp (point) nil t t)))
-               (s (apply #'concat xs)))
-           (remove-list-of-text-properties 0 (length s) '(line-prefix) s)
-           (add-face-text-property 0 (length s) 'default t s)
-           (overlay-put ov 'window (selected-window))
-           (overlay-put ov 'before-string s)
-           (overlay-put ov 'display ""))))
-    (kill-buffer buffer) (goto-char save-pos))
-  (defun corfu-terminal--popup-hide ()
-    "Hide Corfu overlays popup."
-    (delete-overlay corfu-terminal--ov))
-  (fset #'corfu--popup-support-p #'always)
-  (fset #'corfu--popup-show #'corfu-terminal--popup-show)
-  (fset #'corfu--popup-hide #'corfu-terminal--popup-hide)
-  ;; Restrict size of Corfu popup to fit in window
-  (define-advice corfu--candidates-popup (:around (orig-fun pos))
-    (let* ((y (cdr (posn-x-y pos)))
-           (corfu-max-width (min corfu-max-width (- (window-text-width) 5)))
-           (corfu-count (min corfu-count (max y (- (window-text-height) y 1)))))
-      (funcall orig-fun pos))))
-(setq completion-in-region-function
-      (lambda (&rest args)
-        (apply (if (minibufferp) #'minibuffer-completion-in-region
-                 (corfu-mode) completion-in-region-function)
-               args)))
-(define-key global-map [remap indent-for-tab-command]
-  (lambda (arg)
-    "Perform symbol completion and/or indent if in the left margin.
-Differs from having `tab-always-indent' set to `complete' by always
-completing if point is right of the left margin. Otherwise, completion
-would never be attempted in case of TAB cycle indentation."
-    (interactive "P")
-    (setq this-command 'indent-for-tab-command)
-    (if (> (current-column) (current-indentation))
-        (completion-at-point)
-      (let ((tab-always-indent 'complete) transient-mark-mode)
-        (indent-for-tab-command arg)))))
-;; Insert completion without overwriting text right of cursor
-(define-advice completion--capf-wrapper (:filter-return (res) nil -1)
-  (and (consp (cdr-safe res)) (not (functionp (cdr res)))
-       (setcar (nthcdr 2 res) (point))) ; Set `end' to point
-  res)
-
-(defun file-completion-at-point (&optional interactive)
-  "Complete file name at point."
-  (interactive "p")
-  (if interactive
-      (let ((completion-at-point-functions '(file-completion-at-point)))
-        (completion-at-point))
-    (require 'ffap)
-    (ffap-string-at-point)
-    `(,@ffap-string-at-point-region
-      completion-file-name-table
-      :predicate ,(lambda (s) (not (string= s "./")))
-      :company-kind ,(lambda (s) (if (eq (aref s (1- (length s))) ?/) 'folder 'file))
-      :exit-function ; Continue completing descendants of directory
-      ,(lambda (s _status)
-         (when (eq (aref s (1- (length s))) ?/) (file-completion-at-point t))))))
-
 ;;; Language server protocol
 (setq flymake-indicator-type nil ; Do not reserve margin for errors
       flymake-fringe-indicator-position nil ; Do not show "!" at errors
@@ -738,6 +726,19 @@ would never be attempted in case of TAB cycle indentation."
 (with-eval-after-load 'eglot
   (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
   (define-key eglot-mode-map [f2] 'eglot-rename))
+
+;;; Reading documentation
+(setq help-window-select t
+      help-window-keep-selected t)
+(add-hook 'help-fns-describe-function-functions #'shortdoc-help-fns-examples-function)
+(evil-define-key* 'normal help-mode-map
+  "\C-t" 'help-go-back
+  "s" 'help-view-source)
+
+(straight-use-package 'devdocs)
+(setq devdocs-window-select t)
+(add-hook 'devdocs-mode-hook (lambda () (kill-local-variable 'truncate-lines)))
+(define-key help-map "D" 'devdocs-lookup)
 
 ;;; Spell checking
 (setq ispell-silently-savep t)
@@ -806,6 +807,8 @@ If a prefix argument is given, the messages will be \"undeleted\"."
     (kbd "RET") 'notmuch-tree-show-message))
 ;; Autoloads for Nixpkgs packages are not loaded without package.el
 (autoload 'notmuch-jump-search "notmuch")
+
+(editorconfig-mode)
 
 (straight-use-package 'rmsbolt) ; Compiler Explorer
 
