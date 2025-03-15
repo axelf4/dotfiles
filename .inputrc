@@ -1,10 +1,9 @@
 # Use vi key bindings
 set editing-mode vi
-# Perform completion in case-insensitive fashion
 set completion-ignore-case On
-# List matches for ambiguous words at first Tab press
-set show-all-if-ambiguous On
 set colored-completion-prefix On
+# List matches if there are more than one
+set show-all-if-ambiguous On
 # Initially complete only common prefix
 set menu-complete-display-prefix On
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 # Sync mail archived on near side
-notmuch search --output=files --format=text0 folder:gmail/INBOX not tag:inbox \
-	| grep --null-data /gmail/INBOX/ \
-	| xargs -r --null rm
+notmuch search --output=files --format=text0 folder:gmail/INBOX not tag:inbox |
+	grep --null-data /gmail/INBOX/ |
+	xargs -r --null rm
 
 # Sync deleted mail
 notmuch search --output=files --format=text0 \
-		tag:deleted not folder:gmail/[Gmail]/Trash \
-	| while IFS= read -rd '' file; do
-	f="$(basename "$file")"
-	mv --no-target-directory "$file" ~/.mail/gmail/[Gmail]/Trash/new/"${f%,U=*}"
-done
+		tag:deleted not folder:gmail/[Gmail]/Trash |
+	while IFS= read -rd '' file; do
+		f=$(basename "$file")
+		mv --no-target-directory "$file" ~/.mail/gmail/[Gmail]/Trash/new/"${f%,U=*}"
+	done
 
 mbsync --verbose --all # Fetch new mail
