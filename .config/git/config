@@ -1,12 +1,16 @@
 [user]
 	name = Axel Forsman
 	email = axel@axelf.se
-[push]
-	default = simple
-[pull]
-	ff = only
+[branch]
+	sort = -committerdate
+[diff]
+	algorithm = histogram
 [merge]
 	conflictStyle = zdiff3
+[pull]
+	ff = only
+[rebase]
+	updateRefs = true
 [interactive]
 	singleKey = true
 
