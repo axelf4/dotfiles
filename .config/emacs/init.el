@@ -501,6 +501,20 @@ would never be attempted in case of TAB cycle indentation."
 (add-hook 'project-find-functions (lambda (_dir) (cons 'transient (cwd))) 50)
 (advice-add #'evil-ex :around #'with-cwd)
 
+;; Contrary to the `process-environment' docstring, the frame-local
+;; environment is not a fallback. Remember the cons cell of the
+;; initial environment to swap it out.
+(set-frame-parameter nil 'environment process-environment)
+(let ((frame-env-tail (push "0_frame_sentinel" process-environment)))
+  (defun with-frame-environment (fun &rest args)
+    "Call FUN with ARGS and the frame-local `process-environment' and `exec-path'."
+    (cl-letf* ((frame-env (frame-parameter nil 'environment))
+               (frame-path (cl-loop for x in frame-env if (string-prefix-p "PATH=" x)
+                                    thereis (parse-colon-path (substring x 5))))
+               (exec-path (nconc frame-path exec-path))
+               ((cdr frame-env-tail) frame-env))
+      (apply fun args))))
+
 (let ((find-files-program
        (cond ((executable-find "rg") '("rg" "--color=never" "--files"))
              ((executable-find "find") '("find" "-type" "f")))))
@@ -723,6 +737,7 @@ mode buffer."
       eglot-extend-to-xref t
       eglot-ignored-server-capabilities '(:documentHighlightProvider)
       jsonrpc-event-hook ())
+(advice-add #'eglot--connect :around #'with-frame-environment)
 (with-eval-after-load 'eglot
   (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
   (define-key eglot-mode-map [f2] 'eglot-rename))
