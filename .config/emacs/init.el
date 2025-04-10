@@ -666,8 +666,8 @@ mode buffer."
   "l" 'magit-log "\C-l" 'magit-log-refresh
   "P" 'magit-push
   "r" 'magit-rebase "R" 'magit-file-rename
-  "s" 'magit-stage-file "S" 'magit-stage-modified
-  "u" 'magit-unstage "U" 'magit-unstage-all
+  "s" 'magit-stage-files "S" 'magit-stage-modified
+  "u" 'magit-unstage-files "U" 'magit-unstage-all
   "x" 'magit-delete-thing "X" 'magit-reset
   "gz" 'magit-stash
   "gr" 'magit-refresh "gR" 'magit-refresh-all
