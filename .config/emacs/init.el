@@ -480,10 +480,9 @@ would never be attempted in case of TAB cycle indentation."
       (let ((tab-always-indent 'complete) transient-mark-mode)
         (indent-for-tab-command arg)))))
 ;; Insert completion without overwriting text right of cursor
-(define-advice completion--capf-wrapper (:filter-return (res) nil -1)
-  (and (consp (cdr-safe res)) (not (functionp (cdr res)))
-       (setcar (nthcdr 2 res) (point))) ; Set `end' to point
-  res)
+(define-advice completion--capf-wrapper (:around (orig-fun fun which) nil -1)
+  (save-restriction (narrow-to-region (point-min) (point))
+                    (funcall orig-fun fun which)))
 
 ;;; Project management
 (set-frame-parameter nil 'cwd default-directory) ; For the initial frame
