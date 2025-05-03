@@ -32,7 +32,7 @@ nnoremap <expr> g; {l, c -> l[0]->get(l[1] - 1, {}) == #{lnum: c[1], col: c[2] -
 nnoremap <F9> <Cmd>wall<Bar>make<CR>
 noremap <leader>w <C-w>
 " Write with sudo from within Vim
-command! -bar W w !sudo tee % >/dev/null
+command! -bar W write !sudo tee % >/dev/null
 augroup vimrc
 	autocmd!
 augroup END

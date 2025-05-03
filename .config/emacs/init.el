@@ -356,7 +356,8 @@ Like \\[evil-goto-last-change] but in the opposite direction."
       completion-styles '(hotfuzz)
       completion-category-defaults ()
       completion-category-overrides '((buffer (display-sort-function . identity)) ; Keep MRU
-                                      (eglot (styles hotfuzz))))
+                                      (eglot (styles hotfuzz)))
+      completions-detailed t)
 (vertico-mode)
 
 (defun minibuffer-completion-in-region (start end collection &optional predicate)
@@ -498,7 +499,9 @@ would never be attempted in case of TAB cycle indentation."
  (lambda ()
    (when-let (client (frame-parameter nil 'client))
      (set-frame-parameter nil 'cwd (process-get client 'server-client-directory)))))
-(add-hook 'project-find-functions (lambda (_dir) (cons 'transient (cwd))) 50)
+(defun project-try-cwd (dir)
+  (let ((res (cwd))) (when (file-in-directory-p dir res) (cons 'transient res))))
+(add-hook 'project-find-functions #'project-try-cwd 50)
 (advice-add #'evil-ex :around #'with-cwd)
 
 ;; Contrary to the `process-environment' docstring, the frame-local
@@ -529,6 +532,7 @@ would never be attempted in case of TAB cycle indentation."
 (setq dired-auto-revert-buffer #'dired-directory-changed-p
       dired-dwim-target t
       dired-recursive-copies 'always dired-recursive-deletes 'always
+      dired-create-destination-dirs 'ask
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
 (evil-define-key nil dired-mode-map
