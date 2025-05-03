@@ -97,6 +97,7 @@
  evil-insert-state-modes '(comint-mode)
  evil-motion-state-modes ()
  evil-emacs-state-modes '(debugger-mode))
+(defvaralias 'evil-shift-width 'tab-width) ; set shiftwidth=0
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
 
