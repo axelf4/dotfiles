@@ -422,8 +422,8 @@ Like \\[evil-goto-last-change] but in the opposite direction."
          (add-face-text-property 0 (length s) 'default t s)
          (overlay-put ov 'window (selected-window))
          (overlay-put ov 'before-string s)
-         (overlay-put ov 'display ""))))
-  (kill-buffer buffer) (goto-char save-pos))
+         (overlay-put ov 'display "")))
+    (kill-buffer buffer) (goto-char save-pos)))
 (defun corfu-terminal--popup-hide ()
   "Hide Corfu overlays popup."
   (delete-overlay corfu-terminal--ov))
