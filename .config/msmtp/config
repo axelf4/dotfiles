@@ -3,12 +3,12 @@ auth
 tls
 
 account axelf.se
-host smtp.sendgrid.net
+host mail.smtp2go.com
+port 2525
 from axel@axelf.se
-user apikey
+user axelf.se
 # Redirect the "queue ... destroyed while proxies still attached: ..."
 # warning as the Sendmail Emacs package interprets it as an error.
-passwordeval "kwallet-query --read-password msmtp/sendgrid kdewallet 2>&1"
-tls_starttls off
+passwordeval "kwallet-query --read-password smtp2go/axelf.se kdewallet 2>&1"
 
 account default : axelf.se
