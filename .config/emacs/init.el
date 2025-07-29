@@ -744,6 +744,7 @@ mode buffer."
 (advice-add #'eglot--connect :around #'with-frame-environment)
 (with-eval-after-load 'eglot
   (setf (alist-get 'unison-mode eglot-server-programs) '("127.0.0.1" 5757))
+  (setf (alist-get 'qml-mode eglot-server-programs) '("qmlls" "-E"))
   (define-key eglot-mode-map [f2] 'eglot-rename))
 
 ;;; Reading documentation
