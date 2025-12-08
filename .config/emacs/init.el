@@ -238,12 +238,11 @@ Start over if changes have been made. If two changes are on the same
 line less than `fill-column' or 79 columns apart only the last one is
 considered."
   (interactive "p")
+  (add-hook 'after-change-functions #'goto-chg--reset nil t)
   (cl-destructuring-bind (cache all list . deltas)
-      (or goto-chg--state
-          (progn (add-hook 'after-change-functions #'goto-chg--reset nil t)
-                 (list (cons () ()) () buffer-undo-list)))
+      (or goto-chg--state (list (cons () ()) () buffer-undo-list))
     (when-let ((p (car (if (< count 0) (car cache) (cdr cache))))
-               ((= (if (not (or (evil-normal-state-p) (evil-motion-state-p))) p
+               ((= (if (not (evil-normal-state-p)) p
                      (save-excursion (goto-char p) (evil-adjust-cursor) (point)))
                    (point))))
       (setq count (+ count (cl-signum count))))
@@ -252,32 +251,30 @@ considered."
     (while (and (> count 0) (cdr cache))
       (setq count (1- count)) (push (goto-char (pop (cdr cache))) (car cache)))
     (while (and (> count 0) list)
-      (let ((old-deltas deltas) pos)
-        ;; Collect deltas and position of most recent change in this changeset
-        (while (pcase (pop list)
-                 ('nil) ; Undo boundary
-                 (`(,(and (pred integerp) beg) . ,end) ; Insertion
-                  (unless pos (setq pos (1- end)))
-                  (push (cons beg (cons beg (- end beg))) deltas))
-                 (`(,(and (pred stringp) text) . ,position) ; Deletion
-                  (let ((beg (abs position)) (len (length text)))
-                    (unless pos (setq pos beg))
-                    (push (cons beg (cons (+ beg len) (- len))) deltas)))
-                 (`(nil ,_property ,_value ,_beg . ,end) ; Textprop change
-                  (unless pos (setq pos end)) t)
-                 (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
-                  (unless pos (setq pos end))
-                  (push (cons beg (cons end delta)) deltas))
-                 (_ t)))
+      (let ((old-deltas deltas) pos undo)
+        ;; Collect deltas and position of least recent change in this changeset
+        (while (setq undo (pop list))
+          (pcase undo
+            (`(,(and (pred integerp) beg) . ,end) ; Insertion
+             (setq pos (1- end))
+             (push (cons beg (cons beg (- end beg))) deltas))
+            (`(,(and (pred stringp) text) . ,position) ; Deletion
+             (let ((beg (abs position)) (len (length text)))
+               (setq pos beg)
+               (push (cons beg (cons (+ beg len) (- len))) deltas)))
+            (`(nil ,_property ,_value ,_beg . ,end) (setq pos end)) ; Textprop
+            (`(apply ,delta ,beg ,end ,_fun-name . ,_args)
+             (setq pos end)
+             (push (cons beg (cons end delta)) deltas))))
         (when pos
           ;; Adjust position by applying future deltas
-          (cl-loop for (beg end . delta) in old-deltas when (< beg pos)
+          (cl-loop for (beg end . delta) in old-deltas if (< beg pos)
                    do (setq pos (+ (if (< pos end) end pos) delta)))
           (cl-destructuring-bind (&whole tail &optional left right . _)
-              (cl-loop for xs on all and prev = nil then xs while (< (car xs) pos)
-                       finally return (or prev (cons nil all)))
+              (cl-loop for xs on all and prev = (cons nil all) then xs
+                       while (< (car xs) pos) finally return prev)
             (cl-flet ((too-close-p (min max)
-                        (when (< (abs (- min max)) (if auto-fill-function fill-column 79))
+                        (when (< (- max min) (if auto-fill-function fill-column 79))
                           (not (save-excursion (goto-char min) (search-forward "\n" max t))))))
               (unless (or (and left (too-close-p left pos))
                           (and right (too-close-p pos right)))
