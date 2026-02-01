@@ -3,10 +3,14 @@
 	email = axel@axelf.se
 [branch]
 	sort = -committerdate
+[core]
+	abbrev = 12
 [diff]
 	algorithm = histogram
 [merge]
 	conflictStyle = zdiff3
+[pretty]
+	fixes = Fixes: %h (\"%s\")
 [pull]
 	ff = only
 [rebase]
