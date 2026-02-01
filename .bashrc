@@ -36,6 +36,6 @@ alias o=xdg-open
 alias ..='cd ..'
 alias ...='cd ../..'
 alias cfg='git --git-dir="$HOME"/.dotfiles --work-tree="$HOME"'
-alias less='less --RAW-CONTROL-CHARS'
+alias less='less --RAW-CONTROL-CHARS --ignore-case'
 alias ip='ip -color=auto' # Enable ip(8) color output
 alias objdump='objdump --disassembler-options=intel --disassembler-color=terminal'

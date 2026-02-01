@@ -37,6 +37,7 @@
 (menu-bar-mode 0) ; Disable the menu bar
 (global-auto-revert-mode)
 (delete-selection-mode)
+(editorconfig-mode)
 (add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 (global-set-key [escape] 'keyboard-escape-quit)
 
@@ -517,7 +518,7 @@ would never be attempted in case of TAB cycle indentation."
 
 (let ((find-files-program
        (cond ((executable-find "rg") '("rg" "--color=never" "--files"))
-             ((executable-find "find") '("find" "-type" "f")))))
+             (t '("find" "-type" "f")))))
   (defun find-file-rec ()
     "Find a file in the current working directory recursively."
     (interactive)
@@ -824,8 +825,6 @@ If a prefix argument is given, the messages will be \"undeleted\"."
     (kbd "RET") 'notmuch-tree-show-message))
 ;; Autoloads for Nixpkgs packages are not loaded without package.el
 (autoload 'notmuch-jump-search "notmuch")
-
-(editorconfig-mode)
 
 (straight-use-package 'rmsbolt) ; Compiler Explorer
 
