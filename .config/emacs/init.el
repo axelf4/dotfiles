@@ -19,7 +19,6 @@
       kill-buffer-delete-auto-save-files t
       tags-revert-without-query t
       tags-add-tables t
-      xref-auto-jump-to-first-xref t
       undo-auto-current-boundary-timer t ; Disable automatic undo boundaries
       show-paren-predicate t ; Enable Show Paren Mode in special buffers too
       long-line-threshold nil
@@ -146,6 +145,8 @@
                  (buffer-substring-no-properties
                   (goto-char evil-visual-beginning) evil-visual-end))))
       (funcall oldfun t direction count))))
+;; Reinitialize the preexistent "*Messages*" buffer
+(with-current-buffer (messages-buffer) (evil-normalize-keymaps))
 
 (defun format-binary (num)
   "Format non-negative integer NUM in binary."
@@ -252,9 +253,9 @@ considered."
     (while (and (> count 0) (cdr cache))
       (setq count (1- count)) (push (goto-char (pop (cdr cache))) (car cache)))
     (while (and (> count 0) list)
-      (let ((old-deltas deltas) pos undo)
+      (let ((old-deltas deltas) pos)
         ;; Collect deltas and position of least recent change in this changeset
-        (while (setq undo (pop list))
+        (while-let ((undo (pop list)))
           (pcase undo
             (`(,(and (pred integerp) beg) . ,end) ; Insertion
              (setq pos (1- end))
@@ -299,7 +300,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
   (let ((prefix (when fill-prefix (regexp-quote fill-prefix)))
         (erei (comment-padleft
                (comment-string-reverse (or comment-continue comment-start)) 're))
-        spt next-linec-pt)
+        next-linec-pt)
     (save-restriction
       (narrow-to-region
        (progn (goto-char beg) (or (comment-beginning) beg))
@@ -307,7 +308,7 @@ Like \\[evil-goto-last-change] but in the opposite direction."
               (end-of-line (when (<= (pos-bol) beg) 2)) (point)))
       (insert ?\n)
       (goto-char (point-min))
-      (while (setq spt (comment-search-forward (point-max) t))
+      (while-let ((spt (comment-search-forward (point-max) t)))
         (let ((npt (pos-bol 2)) (iept (point-max)))
           (if (when (progn (goto-char spt) (comment-forward))
                 (setq iept (save-excursion (comment-enter-backward) (point)))
@@ -339,11 +340,6 @@ Like \\[evil-goto-last-change] but in the opposite direction."
   "Toggle comment from BEG to END."
   (interactive "<r>")
   (comment-or-uncomment-region beg end))
-
-;; Reinitialize the preexistent "*Messages*" buffer
-(with-current-buffer (messages-buffer) (evil-normalize-keymaps))
-
-(evil-define-key 'normal xref--xref-buffer-mode-map (kbd "RET") 'xref-goto-xref)
 
 ;;; Minibuffer completion
 (straight-use-package 'hotfuzz)
@@ -525,6 +521,34 @@ would never be attempted in case of TAB cycle indentation."
     (find-file (completing-read
                 "Find file: " (apply #'process-lines find-files-program)))))
 (advice-add #'find-file-rec :around #'with-cwd)
+
+;; Finding identifiers
+(setq xref-auto-jump-to-first-definition t
+      xref-auto-jump-to-first-xref t)
+;; If Xref backend produced no results then fallback to the next one
+(define-advice xref--create-fetcher (:override (input kind arg))
+  (or (run-hook-wrapped
+       'xref-backend-functions
+       (let ((method (intern (format "xref-backend-%s" kind))))
+         (lambda (f) (and-let* ((backend (funcall f))
+                                (xrefs (save-excursion (funcall method backend arg))))
+                       (lambda () xrefs))))) ; Forgo refresh support
+      (xref--not-found-error kind input)))
+(define-advice etags--xref-backend (:before-while ())
+  (or tags-table-list tags-file-name)) ; Silence "Visit tags table:" fallback prompt
+(defun search--xref-backend () 'search)
+(cl-defmethod xref-backend-definitions ((_backend (eql 'search)) identifier)
+  (let ((regexp (format "\\_<%s\\_>" (regexp-quote identifier))) (old-pos (point)) contp)
+    (goto-char (point-min))
+    (while (when (re-search-forward regexp nil t)
+             (setq contp ; Skip strings/comments
+                   (or (let ((ppss (syntax-ppss))) (nth 3 ppss) (nth 4 ppss))
+                       (<= (match-beginning 0) old-pos (match-end 0))))))
+    (unless contp (list (xref-make identifier
+                                   (xref-make-buffer-location
+                                    (current-buffer) (match-beginning 0)))))))
+(add-hook 'xref-backend-functions #'search--xref-backend 95)
+(with-eval-after-load 'xref (evil-make-overriding-map xref--xref-buffer-mode-map))
 
 ;; File browsing
 (setq dired-auto-revert-buffer #'dired-directory-changed-p
@@ -833,7 +857,7 @@ If a prefix argument is given, the messages will be \"undeleted\"."
   "\C-a" 'inc-at-point "\C-x" 'dec-at-point
   "U" 'vundo
   "gc" 'evil-comment
-  "gr" 'xref-find-references
+  "gd" 'xref-find-definitions "gr" 'xref-find-references
   [f9] 'compile-or-recompile
   (kbd "<leader>u") 'universal-argument
   (kbd "<leader>h") 'help-command
