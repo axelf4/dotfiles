@@ -14,6 +14,7 @@
 [pull]
 	ff = only
 [rebase]
+	autoStash = true
 	updateRefs = true
 [interactive]
 	singleKey = true
