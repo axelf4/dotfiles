@@ -17,6 +17,7 @@
       auto-save-no-message t
       auto-save-include-big-deletions t
       kill-buffer-delete-auto-save-files t
+      shell-kill-buffer-on-exit t
       tags-revert-without-query t
       tags-add-tables t
       undo-auto-current-boundary-timer t ; Disable automatic undo boundaries
@@ -96,7 +97,8 @@
  evil-mode-line-format nil
  evil-insert-state-modes '(comint-mode)
  evil-motion-state-modes ()
- evil-emacs-state-modes '(debugger-mode))
+ evil-emacs-state-modes '(debugger-mode)
+ evil-want-keybinding nil)
 (defvaralias 'evil-shift-width 'tab-width) ; set shiftwidth=0
 (evil-mode)
 (evil-set-leader 'motion (kbd "SPC"))
@@ -133,7 +135,6 @@
              (set-window-prev-buffers nil prev-buffers)))))
   (advice-add #'evil-window-split :around f)
   (advice-add #'evil-window-vsplit :around f))
-(evil-define-key* 'normal special-mode-map [escape] 'quit-window)
 ;; Visual "*": Search for the selected text instead of the word at point
 (define-advice evil-ex-start-word-search
     (:around (oldfun unbounded direction count &optional symbol))
@@ -557,19 +558,21 @@ would never be attempted in case of TAB cycle indentation."
       dired-create-destination-dirs 'ask
       dired-listing-switches "-Ahl --group-directories-first")
 (add-hook 'dired-mode-hook #'dired-hide-details-mode)
-(evil-define-key nil dired-mode-map
-  (kbd "SPC") nil)
+(add-hook 'dired-mode-hook #'hl-line-mode)
 (evil-define-key 'normal dired-mode-map
-  "f" 'find-file "I" 'dired-toggle-read-only)
-(evil-define-key nil wdired-mode-map
-  [remap evil-write] 'wdired-finish-edit)
+  (kbd "RET") 'dired-find-file [mouse-2] 'dired-mouse-find-file-other-window
+  "^" 'dired-up-directory "+" 'dired-create-directory
+  "C" 'dired-do-copy "D" 'dired-do-delete "R" 'dired-do-rename
+  "q" 'dired-toggle-read-only "Y" 'dired-copy-filename-as-kill
+  "f" 'find-file "gr" 'revert-buffer "gx" 'dired-do-open
+  "!" 'dired-do-shell-command "(" 'dired-hide-details-mode)
+(evil-define-key nil wdired-mode-map [remap evil-write] 'wdired-finish-edit)
 
 (defun sudo-file-name (file)
   "Return TRAMP file name for editing FILE as root with sudo."
   (concat
    (if-let (remote-id (copy-sequence (file-remote-p file)))
-       (progn (aset remote-id (1- (length remote-id)) ?|) ; Replace :
-              remote-id)
+       (progn (aset remote-id (1- (length remote-id)) ?|) remote-id) ; Replace :
      "/")
    "sudo::" (or (file-remote-p file 'localname) file)))
 
@@ -890,6 +893,7 @@ If a prefix argument is given, the messages will be \"undeleted\"."
                  (when (save-excursion (comment-beginning))
                    `(lambda () (interactive) (,comment-line-break-function)))))
   "\C-x\C-f" 'file-completion-at-point)
+(evil-define-key* 'normal special-mode-map [escape] 'quit-window)
 
 ;;; Language support
 (add-hook 'emacs-lisp-mode-hook (lambda () (setq tab-width 8
