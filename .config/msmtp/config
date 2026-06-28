@@ -7,6 +7,6 @@ host mail.smtp2go.com
 port 2525
 from axel@axelf.se
 user axelf.se
-passwordeval "secret-tool lookup domain smtp2go.com user axelf.se"
+auth plain
 
 account default : axelf.se

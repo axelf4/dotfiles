@@ -51,4 +51,20 @@ create a `.bash_profile` with
 Note however that it is then necessary to test if interactive (with `$-`)
 before trying to change terminal settings.
 
+## Email
+
+To set up IMAP synchronization with `mbsync(1)` and SMTP with
+`msmtp(1)`:
+1. Create a new Google Account app password, see
+   [Sign in with app passwords](https://support.google.com/accounts/answer/185833),
+   and add it to the system keyring:
+   ```sh
+   secret-tool store --label='Gmail app password' user axelsfor@gmail.com
+   ```
+1. Add the [SMTP2GO](https://app-eu.smtp2go.com/sending/smtp_users/)
+   SMTP password to the system keyring:
+   ```sh
+   secret-tool store --label=msmtp host mail.smtp2go.com service smtp user axelf.se
+   ```
+
 [straight.el]: https://github.com/raxod502/straight.el
